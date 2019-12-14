@@ -6,7 +6,8 @@ class TilemapEditorWindow:
 
     def __init__(self, parent):
         """Editor window for a level"""
-        pass
+        self.panel = ttk.Frame(parent)
+        parent.add(self.panel, text="Map Editor")
 
 
 class SelectionPane:
@@ -51,8 +52,6 @@ class App:
         self.source.add(tab2, text="Tab 2")
 
         self.source.pack(expand=1, fill="both")
-
-        # Do basic setup
 
 
 if __name__ == "__main__":
