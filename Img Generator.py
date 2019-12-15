@@ -2,14 +2,14 @@ import base64
 
 
 def export():
-    with open("test.gif", "wb") as f:
+    with open("Image/test.gif", "wb") as f:
         encoded_img = base64.decodebytes(b'''
                 R0lGODlhCAAIAMIEAAAAAP/SAP/bNNnZ2cbGxsbGxsbGxsbGxiH5BAEKAAQALAAA
                 AAAIAAgAAAMVGDBEA0qNJyGw7AmxmuaZhWEU5kEJADs=
                 ''')
         f.write(encoded_img)
 
-    with open("test2.gif", "wb") as f:
+    with open("Image/test2.gif", "wb") as f:
         encoded_img2 = base64.decodebytes(b'''
                 R0lGODlhCAAIAMIEAAAAAOUqKv9mZtnZ2Ts7Ozs7Ozs7Ozs7OyH+EUNyZWF0ZWQg
                 d2l0aCBHSU1QACH5BAEKAAQALAAAAAAIAAgAAAMVGDBEA0qNJyGw7AmxmuaZhWEU
@@ -17,7 +17,7 @@ def export():
                 ''')
         f.write(encoded_img2)
 
-    with open("test3.gif", "wb") as f:
+    with open("Image/test3.gif", "wb") as f:
         encoded_img3 = base64.decodebytes(b'''
                 R0lGODlhCAAIAMIBAAAAADs7O4+Pj9nZ2Ts7Ozs7Ozs7Ozs7OyH+EUNyZWF0ZWQg
                 d2l0aCBHSU1QACH5BAEKAAQALAAAAAAIAAgAAAMVGDBEA0qNJyGw7AmxmuaZhWEU
@@ -27,9 +27,9 @@ def export():
 
 
 def main():
-    for i in ["close_active", "close_pressed", "close", "addnew", "hammer"]:
+    for i in ["close_active", "close_pressed", "close", "addnew", "hammer", "draw_tool", "move_tool"]:
         print(i + ": ")
-        with open(i + ".gif", "rb") as f:
+        with open("Images/" + i + ".gif", "rb") as f:
             print(base64.encodebytes(f.read()))
 
 

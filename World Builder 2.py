@@ -95,7 +95,6 @@ class CustomNotebook(ttk.Notebook):
 
     def on_close_press(self, event):
         """Called when the button is pressed over the close button"""
-
         element = self.identify(event.x, event.y)
 
         # Check if user pressed "closed"
@@ -164,36 +163,46 @@ class CustomNotebook(ttk.Notebook):
         ])
         # print(style.layout("CustomNotebook.tab"))
         # print(style.element_names())
-        style.layout("CustomNotebook", [("CustomNotebook.close", {"side": "right", "sticky": "nswe"})])
+        # style.layout("CustomNotebook", [("CustomNotebook.close", {"side": "right", "sticky": "nswe"})])
 
 
 class TilemapEditorWindow:
 
+    imgs = {}
+    __initialized = False
+
     def __init__(self, parent):
         """Overarching editor window for the levels"""
+        # Check if PhotoImages are initialized before proceeding
+        if not TilemapEditorWindow.__initialized:
+            TilemapEditorWindow._initialize_images()
+
         # Add editor to parent window
         self.frame = ttk.Frame(parent)
         self.frame.pack(fill=tk.X, expand=1)
         parent.add(self.frame, text="Map Editor")
 
         # Layout setup
+        # Add tool mode tracking variable
+        self.tool_mode = tk.IntVar(self.frame, 0, "tool_mode")
+        # self.tool_mode.trace("w", self.tool_callback)
+
         # Add buttons panel
         self.buttons_bar = ttk.Frame(self.frame)
         self.buttons_bar.grid(row=0, column=1, sticky=tk.NW, pady=4)
-        self.button1 = tk.Button(self.buttons_bar, text="No", command=None, width=2, height=1)
-        self.button1.grid(row=0, column=1, sticky=tk.NW)
+        # Add individual buttons
+        for i, j in enumerate(["draw", "move"]):
+            self.tool_button = tk.Radiobutton(self.buttons_bar, indicator=0, value=i, variable=self.tool_mode,
+                                              image=TilemapEditorWindow.imgs[j])
+            self.tool_button.grid(row=0, column=i + 1, sticky=tk.NW)
 
         # Set up level viewing section
         self.tilemap_panel = CustomNotebook(self.frame)
+        self.tilemap_panel.bind("<<NotebookTabClosed>>", self.close_view)
         self.tilemap_panel.grid(row=1, column=1, sticky=tk.NW)
 
         # Add "new map" button to viewing pane
-        self.addnew_image = tk.PhotoImage("img_addnew_active", data='''R0lGODlhC
-        gAKAMIDAAAvAACQAACzAE3bO03bO03bO03bO03bOyH5BAEKAAQALAAAAAAKAAoAAAMg\nSAo
-        RoJAwF5cQb4F9927XMFwNKIik43UeBHSV1GTRRCcAOw==
-        ''')
-
-        self.new_view_button = ttk.Button(self.frame, command=self.new_view, image=self.addnew_image)
+        self.new_view_button = ttk.Button(self.frame, command=self.new_view, image=TilemapEditorWindow.imgs["add_new"])
         self.new_view_button.grid(row=1, column=0, sticky=tk.NW)
 
         # Add the Selection panes
@@ -204,41 +213,85 @@ class TilemapEditorWindow:
         # Create initial tilemap view
         self.new_view()
 
+    @classmethod
+    def _initialize_images(cls):
+        """Initialize all of the PhotoImages"""
+        addnew_data = '''R0lGODlhCgAKAMIDAAAvAACQAACzAE3bO03bO03bO03bO03bOyH5BAEKAAQ
+            ALAAAAAAKAAoAAAMg\nSAoRoJAwF5cQb4F9927XMFwNKIik43UeBHSV1GTRRCcAOw==
+            '''
+
+        draw_tool_data = '''R0lGODlhIAAgAKEAAAAAAP///wAAAAAAACH5BAEKAAIALAAAAAAgACAA
+            AAJalI+py+0PH5ixChAy\nsHLmsHESGIrOVJoXelCqgWlhasYfrdry234yztGRgBYhi2d0vZLECp
+            N38Q2hT6T0uLwqc9pmpLrU\nYXOeH1U2Pf+8ztgYidpS49C6/VUAADs=
+            '''
+
+        move_tool_data = '''R0lGODlhIAAgAIABAAAAAP///yH5BAEKAAEALAAAAAAgACAAAAJajI+p
+            y+0PAwCxmjktxFg3znkK\nCIpLaDJoOnZsm5kUPCe1eh8rEp8977L9dKSicSc5Ko3ApTN4eTp9ue
+            jQ+qkmr8mHFnlJgV9jVlkM\nNR9f2xK7zUXH1e+6HVEAADs=
+            '''
+
+        cls.imgs = {"add_new": tk.PhotoImage("img_addnew_active", data=addnew_data),
+                    "draw": tk.PhotoImage("img_draw_tool", data=draw_tool_data),
+                    "move": tk.PhotoImage("img_move_tool", data=move_tool_data)}
+        cls.__initialized = True
+
     def new_view(self):
         """Create a new, blank view"""
-        TilemapView(self.tilemap_panel)
+        TilemapView(self.tilemap_panel, self.tool_mode)
         self.tilemap_panel.select(self.tilemap_panel.index("end") - 1)
 
-    def close_view(self):
+    def close_view(self, event):
         """Close the currently open view"""
-        self.tilemap_panel.forget("current")
+        # self.tilemap_panel.forget("current")
 
-    def draw_mode(self, event):
-        """Switch to draw mode"""
+    def tool_callback(self, name, index, op):
+        """Set the mode of  to draw mode"""
         # TODO: Add modes to TileMapEditorWindow
-        pass
+        # print("Name:", name)
+        # print("Index:", index)
+        # print("Mode:", op)
+        # print("Draw mode is now: ", self.tool_mode.get())
 
 
 class TilemapView:
 
-    def __init__(self, parent):
+    def __init__(self, parent, control_var):
         """Sub-window for viewing individual levels"""
         # Check if the parent is a notebook, which it SHOULD BE
         if type(parent) != CustomNotebook:
             raise TypeError("Cannot assign a {} to a {}".format(TilemapView, type(parent)))
 
         # Declare some variables
-        self.level_width = 16
-        self.level_height = 9
+        self.level_width = 16 + 5
+        self.level_height = 9 + 5
         self.saved = False
         self.name = "Untitled"
 
         # Create element layout
-        self.view = ttk.Frame(parent, width=64*16, height=64*9, borderwidth=1, relief=tk.SUNKEN)
-        self.canvas = tk.Canvas(self.view, width=64 * self.level_width, height=64 * self.level_height, bg="WHITE", bd=0)
-        self.canvas.pack()
+        self.frame = tk.Frame(parent, borderwidth=1, relief=tk.SUNKEN)
+        self.canvas = tk.Canvas(self.frame, width=64 * 16, height=64 * 9, bg="WHITE", bd=0)
+        self.canvas.grid(row=0, column=0)
 
-        parent.add(self.view)
+        # Add the scrollbars
+        self.canvas_vbar = tk.Scrollbar(self.frame, orient=tk.VERTICAL, command=self.canvas.yview)
+        self.canvas_vbar.grid(row=0, column=1, sticky=tk.N + tk.S)
+        self.canvas_vbar.activate("slider")
+        self.canvas_hbar = tk.Scrollbar(self.frame, orient=tk.HORIZONTAL, command=self.canvas.xview)
+        self.canvas_hbar.grid(row=1, column=0, sticky=tk.E + tk.W)
+        self.canvas_hbar.activate("slider")
+        self.canvas.config(scrollregion=(0, 0, 64 * self.level_width, 64 * self.level_height),
+                           xscrollcommand=self.canvas_hbar.set,
+                           yscrollcommand=self.canvas_vbar.set)
+        self.canvas.xview(tk.MOVETO, 0.0)
+        self.canvas.yview(tk.MOVETO, 0.0)
+
+        # Set up some controls
+        self.control_ref = control_var.trace("w", self.set_mode)
+        parent.bind("<<NotebookTabClosed>>", self.close_view)
+        self.canvas.bind("<B1-Motion>")
+
+        # Add the view to the parent frame
+        parent.add(self.frame)
         self.update_title()
 
         # Draw the grid
@@ -246,28 +299,35 @@ class TilemapView:
 
     def draw_grid(self):
         """Draw the tilemap grid"""
-        self.canvas.create_line(3, 3, 3, 64 * self.level_height, fill="BLACK", width=2.0)
-        self.canvas.create_line(3, 3, 64 * self.level_width, 3, fill="BLACK", width=2.0)
-        for i in range(17):
+        for i in range(self.level_width + 1):
             self.canvas.create_line(64 * i, 0, 64 * i, 64 * self.level_height, fill="BLACK", width=2.0)
-        for i in range(10):
+        for i in range(self.level_height + 1):
             self.canvas.create_line(0, 64 * i, 64 * self.level_width, 64 * i, fill="BLACK", width=2.0)
 
     def update_title(self):
         """Update the title of the view"""
+        # If not saved, add an asterisk in front of the displayed name
         if self.saved:
-            self.view.master.tab(self.view, text=self.name)
+            self.frame.master.tab(self.frame, text=self.name)
         else:
-            self.view.master.tab(self.view, text="*" + self.name)
+            self.frame.master.tab(self.frame, text="*" + self.name)
 
     def draw_tilemap(self):
         """Draw the current level"""
         # TODO: Add functionality to "draw_tilemap"
         pass
 
-    def set_mode(self, mode):
+    def set_mode(self, name, index, op):
         """Set the mode of the window.  Available modes are 'draw' and 'move'"""
         # TODO: Add mode functionality to tilemap view
+        print("Check")
+
+    def draw(self, event):
+        """Event callback for drawing on the grid"""
+        pass
+
+    def move(self, event):
+        """Event callback for moving the grid around"""
         pass
 
 
@@ -277,7 +337,7 @@ class SelectionPane:
         """Overarching class for the object selection panes"""
         self.frame = tk.Frame(parent, borderwidth=1, relief=tk.SUNKEN)
         self.frame.pack(anchor="ne")
-        self.selection_canvas = tk.Canvas(self.frame, width=64*3, height=576, bg="WHITE", bd=0)
+        self.selection_canvas = tk.Canvas(self.frame, width=64 * 3, height=576, bg="WHITE", bd=0)
         self.selection_canvas.pack()
         pass
 
