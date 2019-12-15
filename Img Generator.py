@@ -1,7 +1,7 @@
 import base64
 
 
-def main():
+def export():
     with open("test.gif", "wb") as f:
         encoded_img = base64.decodebytes(b'''
                 R0lGODlhCAAIAMIEAAAAAP/SAP/bNNnZ2cbGxsbGxsbGxsbGxiH5BAEKAAQALAAA
@@ -25,7 +25,9 @@ def main():
                 ''')
         f.write(encoded_img3)
 
-    for i in ["close_active", "close_pressed", "close"]:
+
+def main():
+    for i in ["close_active", "close_pressed", "close", "addnew", "hammer"]:
         print(i + ": ")
         with open(i + ".gif", "rb") as f:
             print(base64.encodebytes(f.read()))
