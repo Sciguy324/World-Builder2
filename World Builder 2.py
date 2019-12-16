@@ -1,7 +1,9 @@
 import tkinter as tk
+import tkinter.messagebox as messagebox
 import tkinter.filedialog as filedialog
 from tkinter import ttk
 from PIL import ImageTk, Image
+from os import path
 import json
 
 
@@ -117,7 +119,7 @@ class CustomNotebook(ttk.Notebook):
         # Close tab if user clicked "close"
         if "close" in element and self._active == index:
             # self.forget(index)
-            self.event_generate("<<NotebookTabClosed>>")
+            self.event_generate("<<NotebookTabClosed>>", x=index)
 
         self.state(["!pressed"])
         self._active = None
@@ -249,8 +251,8 @@ class TilemapEditorWindow:
         # Create the file menubar
         self.filemenu = tk.Menu(self.menubar, tearoff=0)
         self.filemenu.add_command(label="Open Map (Ctrl-O)", command=self._open_map)
-        self.filemenu.add_command(label="Save Map (Ctrl-S)", command=None)
-        self.filemenu.add_command(label="Save Map As (Ctrl-Shift-S)", command=None)
+        self.filemenu.add_command(label="Save Map (Ctrl-S)", command=self._save_map)
+        self.filemenu.add_command(label="Save Map As (Ctrl-Shift-S)", command=self._save_map_as)
         self.filemenu.add_command(label="New Map (Ctrl-N)", command=self.new_view)
         self.menubar.add_cascade(label="File", menu=self.filemenu)
 
@@ -267,6 +269,14 @@ class TilemapEditorWindow:
         self.new_view()
         self.view_list[self.tilemap_panel.index("current")].load_from_file(file)
 
+    def _save_map(self, event=None):
+        """Event callback for saving a level"""
+        self.view_list[self.tilemap_panel.index("current")].quick_save()
+
+    def _save_map_as(self, event=None):
+        """Event callback for save a level as a new file"""
+        self.view_list[self.tilemap_panel.index("current")].save_to_file(None)
+
     def new_view(self, event=None):
         """Create a new, blank view"""
         # Create new view instance
@@ -282,12 +292,11 @@ class TilemapEditorWindow:
 
     def close_view(self, event):
         """Close the currently open view"""
-        index = self.tilemap_panel.index("@%d,%d" % (event.x, event.y))
-
+        # Index of view in question passed as x-coordinate of event
         # Check with the view if it wants to close
-        if self.view_list[index].close():
-            self.tilemap_panel.forget(index)
-            del self.view_list[index]
+        if self.view_list[event.x].close():
+            self.tilemap_panel.forget(event.x)
+            del self.view_list[event.x]
 
     def tool_callback(self, name=None, index=None, op=None):
         """Set the mode of views to draw mode"""
@@ -419,7 +428,10 @@ class TilemapView:
         self.level_height = 9 + 2
         self.tilemap = [[0] * self.level_width for i in range(self.level_height)]
         self.decomap = [[0] * self.level_width for i in range(self.level_height)]
-        self.file_path = ""
+        self.default_start = [0, 0]
+        self.lightmap = []
+        self.loading_zones = []
+        self.file_path = None
 
         # Create element layout
         self.frame = tk.Frame(parent, borderwidth=1, relief=tk.SUNKEN)
@@ -461,7 +473,22 @@ class TilemapView:
         """Tells the view to close"""
         # TODO: Add save request dialogue
         if not self.saved:
-            print("WARNING: NOT SAVED")
+            # If progress is unsaved, ask user if they want to save
+            action = messagebox.askyesnocancel("World Builder 2",
+                                               "Progress is unsaved.  Would you like to save first?",
+                                               icon='warning')
+            # User wants to save progress before closing tab
+            if action:
+                self.save_to_file(self.file_path)
+
+            # User wants to cancel
+            if action is None:
+                return False
+
+            # User wants to continue without saving
+            if action is False:
+                pass
+
         self.frame.unbind_all(["<<TilemapEditorUpdateMode>>",
                                "<<TilemapEditorGridToggle>>",
                                "<<TilemapEditorBorderToggle>>",
@@ -580,6 +607,7 @@ class TilemapView:
         self.canvas.scan_dragto(event.x, event.y, gain=1)
 
     def load_from_file(self, file):
+        """Loads level data from a .json file"""
         with open(file, mode="r") as f:
             level_data = json.load(f)
             self.tilemap = level_data["tilemap"]
@@ -587,10 +615,46 @@ class TilemapView:
             self.level_height = len(self.tilemap)
             self.level_width = len(self.tilemap[0])
             self.name = level_data["name"]
+            self.default_start = level_data["spawn"]
+            self.lightmap = level_data["lightmap"]
+            self.loading_zones = level_data["loading_zones"]
             self.saved = True
         self.set_border(self.border)
         self.update_title()
         self.redraw_view()
+
+    def quick_save(self):
+        """Saves the level data to the file defined by self.file_path"""
+        self.save_to_file(self.file_path)
+
+    def save_to_file(self, file):
+        """Saves the level data to a .json file"""
+        # No file path has been set
+        if file is None:
+            file = filedialog.asksaveasfilename(filetypes=[('JSON File', '*.json')],
+                                                defaultextension=[('JSON File', '*.json')])
+            # User canceled saving, exit function
+            print("File: ", file)
+            if file == "":
+                return
+
+            # Record path
+            file = path.split(file)[1]
+            self.name = path.splitext(file)[0]
+            file = path.join("maps", file)
+            self.file_path = file
+
+        # Write json tag to file
+        with open(file, mode="w") as f:
+            level_data = {"tilemap": self.tilemap,
+                          "decomap": self.decomap,
+                          "loading_zones": self.loading_zones,
+                          "lightmap": self.lightmap,
+                          "spawn": self.default_start,
+                          "name": self.name}
+            json.dump(level_data, f)
+        self.saved = True
+        self.update_title()
 
     @classmethod
     def _initialize(cls):
