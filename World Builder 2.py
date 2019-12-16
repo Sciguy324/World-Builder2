@@ -185,13 +185,17 @@ class TilemapEditorWindow:
         parent.add(self.frame, text="Map Editor")
 
         # Layout setup
-        # Add tool mode tracking variable
+        # Add the tool mode tracking variable
         self.tool_mode = tk.IntVar(self.frame, 0, "tool_mode")
         self.tool_mode.trace("w", self.tool_callback)
 
-        # Add grid mode tracking variable
+        # Add the grid mode tracking variable
         self.grid_mode = tk.IntVar(self.frame, 0, "grid_mode")
         self.grid_mode.trace("w", self.grid_mode_callback)
+
+        # Add the border mode tracking variable
+        self.border_mode = tk.IntVar(self.frame, 0, "border_mode")
+        self.border_mode.trace("w", self.border_mode_callback)
 
         # Add buttons panel
         self.buttons_bar = ttk.Frame(self.frame)
@@ -208,11 +212,17 @@ class TilemapEditorWindow:
                                           image=TilemapEditorWindow.imgs["grid"])
         self.grid_button.grid(row=0, column=3, sticky=tk.NW)
 
+        # Add border toggling buttons
+        self.grid_button = tk.Checkbutton(self.buttons_bar, variable=self.border_mode, indicator=0,
+                                          image=TilemapEditorWindow.imgs["border"])
+        self.grid_button.grid(row=0, column=4, sticky=tk.NW)
+
         # Set up keybindings
         # TODO: Either move these keybindings somewhere else, or limit their scope
         parent.master.bind("<Key-1>", self.keybind_draw_mode)
         parent.master.bind("<Key-2>", self.keybind_move_mode)
         parent.master.bind("<Key-3>", self.keybind_grid_mode)
+        parent.master.bind("<Key-4>", self.keybind_border_mode)
 
         # Set up level viewing section
         self.tilemap_panel = CustomNotebook(self.frame)
@@ -239,9 +249,10 @@ class TilemapEditorWindow:
             AOw==
             '''
 
-        draw_tool_data = '''R0lGODlhIAAgAKEAAAAAAP///wAAAAAAACH5BAEKAAIALAAAAAAg
-            ACAAAAJalI+py+0PH5ixChAy\nsHLmsHESGIrOVJoXelCqgWlhasYfrdry234yztGRgB
-            Yhi2d0vZLECpN38Q2hT6T0uLwqc9pmpLrU\nYXOeH1U2Pf+8ztgYidpS49C6/VUAADs=
+        draw_tool_data = '''R0lGODlhIAAgAKEBAAAAAP///////////yH5BAEKAAIALAAAAAAg
+            ACAAAAJdlI+py+0PH5ixChAy\nsHLmsHHLRIKhiJAqhR6r2rrfGhvYZ57tPbMxr/HtcL
+            nahUgyAou1ZbKJFKKcUhFVN41irVplF4p7\n/oDinSe45dw85SE6bV1XzTCjq27P6y0F
+            ADs=
             '''
 
         move_tool_data = '''R0lGODlhIAAgAIABAAAAAP///yH5BAEKAAEALAAAAAAgACAAAAJa
@@ -254,16 +265,30 @@ class TilemapEditorWindow:
             +koPOZYCZhM6S0ip1Ct0/pdeqlha00rtk1\nzmbTxqUbeY4/CgA7
             '''
 
+        border_mode_data = '''R0lGODlhIAAgAIABAAAAAP///yH5BAEKAAEALAAAAAAgACAAAA
+            JChI+py+0Po5y0woCz3jy4DnZf\nSGJjGZ6o2Kxp67JMLC80p94erJt8n7sFacNY0XVc
+            JVHLUpP0fM16Pov1is1qt5QCADs=
+            '''
+
         cls.imgs = {"add_new": tk.PhotoImage("img_addnew_active", data=addnew_data),
                     "draw": tk.PhotoImage("img_draw_tool", data=draw_tool_data),
                     "move": tk.PhotoImage("img_move_tool", data=move_tool_data),
-                    "grid": tk.PhotoImage("img_grid_mode", data=grid_mode_data)}
+                    "grid": tk.PhotoImage("img_grid_mode", data=grid_mode_data),
+                    "border": tk.PhotoImage("img_border_mode", data=border_mode_data)}
         cls.__initialized = True
 
     def new_view(self):
         """Create a new, blank view"""
-        self.view_list.append(TilemapView(self.tilemap_panel, self.tool_mode.get()))
+        # Create new view instance
+        self.view_list.append(TilemapView(self.tilemap_panel,
+                                          self.tool_mode.get(),
+                                          self.grid_mode.get(),
+                                          self.border_mode.get()))
         self.tilemap_panel.select(self.tilemap_panel.index("end") - 1)
+
+        # Redraw all open views
+        for i in self.view_list:
+            i.frame.event_generate("<<TilemapEditorForceRedraw>>")
 
     def close_view(self, event):
         """Close the currently open view"""
@@ -276,7 +301,6 @@ class TilemapEditorWindow:
 
     def tool_callback(self, name=None, index=None, op=None):
         """Set the mode of views to draw mode"""
-        # TODO: Add modes to TileMapEditorWindow
         for i in self.view_list:
             i.frame.event_generate("<<TilemapEditorUpdateMode>>", x=self.tool_mode.get())
 
@@ -284,6 +308,11 @@ class TilemapEditorWindow:
         """Set the grid visibility of the views"""
         for i in self.view_list:
             i.frame.event_generate("<<TilemapEditorGridToggle>>", x=self.grid_mode.get())
+
+    def border_mode_callback(self, name=None, index=None, op=None):
+        """Set the grid visibility of the views"""
+        for i in self.view_list:
+            i.frame.event_generate("<<TilemapEditorBorderToggle>>", x=self.border_mode.get())
 
     def keybind_draw_mode(self, event):
         """Callback for setting the editor to draw mode"""
@@ -300,24 +329,39 @@ class TilemapEditorWindow:
         else:
             self.grid_mode.set(0)
 
+    def keybind_border_mode(self, event):
+        """Callback for setting the editor to draw mode"""
+        if self.border_mode.get() == 0:
+            self.border_mode.set(1)
+        else:
+            self.border_mode.set(0)
+
 
 class TilemapView:
     # TODO: Tkinterify TilemapView, and make it the responsibility of a subclass of CustomNotebook
 
-    def __init__(self, parent, control_scheme):
+    __initialized = False
+    imgs = {}
+
+    def __init__(self, parent, control_scheme, grid_scheme, border_scheme):
         """Sub-window for viewing individual levels"""
         # Check if the parent is a notebook, which it SHOULD BE
         if type(parent) != CustomNotebook:
             raise TypeError("Cannot assign a {} to a {}".format(TilemapView, type(parent)))
 
+        # Ensure that the images have been initialized
+        if not TilemapView.__initialized:
+            TilemapView._initialize()
+
         # Declare some variables
         self.start_x = 0
         self.start_y = 0
-        self.level_width = 16 + 5
-        self.level_height = 9 + 5
+        self.level_width = 16 + 2
+        self.level_height = 9 + 2
         self.saved = False
         self.name = "Untitled"
-        self.grid = False
+        self.grid = grid_scheme
+        self.border = border_scheme
 
         # Create element layout
         self.frame = tk.Frame(parent, borderwidth=1, relief=tk.SUNKEN)
@@ -340,6 +384,8 @@ class TilemapView:
         # Set up some controls
         self.frame.bind("<<TilemapEditorUpdateMode>>", self._set_mode)
         self.frame.bind("<<TilemapEditorGridToggle>>", self.set_grid)
+        self.frame.bind("<<TilemapEditorBorderToggle>>", self._set_border)
+        self.frame.bind("<<TilemapEditorForceRedraw>>", self.redraw_view)
         self.set_mode(control_scheme)
 
         # Add the view to the parent frame
@@ -356,13 +402,9 @@ class TilemapView:
             print("WARNING: NOT SAVED")
         self.frame.unbind("<<TilemapEditorUpdateMode>>")
         self.frame.unbind("<<TilemapEditorGridToggle>>")
+        self.frame.unbind("<<TilemapEditorBorderToggle>>")
         self.frame.forget()
         return True
-
-    def set_grid(self, event):
-        """Toggle the grid overlay"""
-        self.grid = event.x
-        self.redraw_view()
 
     def draw_grid(self):
         """Draw the tilemap grid"""
@@ -371,13 +413,30 @@ class TilemapView:
         for i in range(self.level_height + 1):
             self.canvas.create_line(0, 64 * i, 64 * self.level_width, 64 * i, fill="BLACK", width=2.0)
 
-    def redraw_view(self):
+    def draw_tilemap(self):
+        """Draw the current level"""
+        # TODO: Add functionality to "draw_tilemap"
+        print("There is no tilemap")
+        pass
+
+    def draw_border(self):
+        """Draw the border"""
+        for i in range(self.level_width):
+            self.canvas.create_image((i * 64 + 32, 32), image=TilemapView.imgs["border"])
+            self.canvas.create_image((i * 64 + 32, self.level_height * 64 - 32), image=TilemapView.imgs["border"])
+        for i in range(1, self.level_height - 1):
+            self.canvas.create_image((32, i * 64 + 32), image=TilemapView.imgs["border"])
+            self.canvas.create_image((self.level_width * 64 - 32, i * 64 + 32), image=TilemapView.imgs["border"])
+
+    def redraw_view(self, event=None):
         """Redraw the entire view"""
         # First redraw the grid if enabled (self.grid=1)
         self.canvas.delete("all")
         if self.grid:
             self.draw_grid()
         self.draw_tilemap()
+        if self.border:
+            self.draw_border()
 
     def update_title(self):
         """Update the title of the view"""
@@ -386,12 +445,6 @@ class TilemapView:
             self.frame.master.tab(self.frame, text=self.name)
         else:
             self.frame.master.tab(self.frame, text="*" + self.name)
-
-    def draw_tilemap(self):
-        """Draw the current level"""
-        # TODO: Add functionality to "draw_tilemap"
-        print("There is no tilemap")
-        pass
 
     def _set_mode(self, event):
         """Event callback for setting the mode/control-scheme of the window."""
@@ -411,9 +464,31 @@ class TilemapView:
             self.canvas.bind("<B1-Motion>", self.move)
             self.canvas.config(cursor="fleur")
 
+    def set_grid(self, event):
+        """Toggle the grid overlay"""
+        self.grid = event.x
+        self.redraw_view()
+
+    def _set_border(self, event):
+        """Event callback for setting the border"""
+        self.set_border(event.x)
+
+    def set_border(self, value):
+        """Toggle the border overlay"""
+        self.border = value
+        if self.border:
+            # Show border
+            self.canvas.delete("all")
+            self.canvas.config(scrollregion=(0, 0, 64 * self.level_width, 64 * self.level_height))
+        else:
+            # Disable border
+            self.canvas.delete("all")
+            self.canvas.config(scrollregion=(64, 64, 64 * (self.level_width - 1), 64 * (self.level_height - 1)))
+        self.redraw_view()
+
     def draw(self, event):
         """Event callback for drawing on the grid"""
-        # TODO: Adding drawing capability
+        # TODO: Add drawing capability
         pass
 
     def set_start(self, event):
@@ -428,6 +503,16 @@ class TilemapView:
             self.start_x = None
             self.start_y = None
         self.canvas.scan_dragto(event.x, event.y, gain=1)
+
+    @classmethod
+    def _initialize(cls):
+        """Initialize the embedded images"""
+        border_tile_data = tk.PhotoImage("img_border_tile", data='''R0lGODlhEAAQ
+            AIABAP/0ANXLACH5BAEKAAEALAAAAAAQABAAAAImhINokMq9WjiQJuvexbHqiYFf\nt4
+            0hKUooqJ5fWrUvutKuOXN3UwAAOw==
+            ''').zoom(64).subsample(16)
+
+        cls.imgs = {"border": border_tile_data}
 
 
 class SelectionPane:

@@ -27,7 +27,8 @@ def export():
 
 
 def main():
-    for i in ["close_active", "close_pressed", "close", "addnew", "hammer", "draw_tool", "move_tool", "grid_mode"]:
+    for i in ["close_active", "close_pressed", "close", "addnew", "hammer", "draw_tool2", "move_tool", "grid_mode",
+              "border_mode", "border"]:
         print(i + ": ")
         with open("Images/" + i + ".gif", "rb") as f:
             print(base64.encodebytes(f.read()))
