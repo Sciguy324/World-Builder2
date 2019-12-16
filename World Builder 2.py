@@ -204,6 +204,9 @@ class TilemapEditorWindow:
         self.border_mode = tk.IntVar(self.frame, 0, "border_mode")
         self.border_mode.trace("w", self.border_mode_callback)
 
+        # Add the tile ID tracking variable
+        self.tile_id = tk.IntVar(self.frame, 0, "selected_tile")
+
         # Add buttons panel
         self.buttons_bar = ttk.Frame(self.frame)
         self.buttons_bar.grid(row=0, column=1, sticky=tk.NW, pady=4)
@@ -241,9 +244,16 @@ class TilemapEditorWindow:
         self.new_view_button.grid(row=1, column=0, sticky=tk.NW)
 
         # Add the Selection panes
-        self.selection_pane = ttk.Frame(self.frame)
-        self.selection_pane.grid(row=1, column=2, sticky=tk.E, ipadx=20)
-        self.tile_pane_test = TilePane(self.selection_pane)
+        self.selection_frame = ttk.Frame(self.frame)
+        self.selection_frame.grid(row=1, column=2, sticky=tk.E, ipadx=20)
+        self.tile_pane = TileCollection(self.selection_frame,
+                                        [i for i, j in TilemapEditorWindow.tile_dict.items()],
+                                        "tile",
+                                        self.tile_id,
+                                        borderwidth=1,
+                                        relief=tk.SUNKEN)
+        self.tile_pane.grid(row=1, column=2, sticky=tk.E, ipadx=20)
+        self.tile_pane.pack(anchor="ne")
 
         # Build the editor window's toolbar
         self.menubar = tk.Menu(self.frame.master.master.master)
@@ -440,10 +450,10 @@ class TilemapView:
 
         # Add the scrollbars
         self.canvas_vbar = tk.Scrollbar(self.frame, orient=tk.VERTICAL, command=self.canvas.yview)
-        self.canvas_vbar.grid(row=0, column=1, sticky=tk.N + tk.S)
+        self.canvas_vbar.grid(row=0, column=1, sticky=tk.NS)
         self.canvas_vbar.activate("slider")
         self.canvas_hbar = tk.Scrollbar(self.frame, orient=tk.HORIZONTAL, command=self.canvas.xview)
-        self.canvas_hbar.grid(row=1, column=0, sticky=tk.E + tk.W)
+        self.canvas_hbar.grid(row=1, column=0, sticky=tk.EW)
         self.canvas_hbar.activate("slider")
         self.canvas.config(scrollregion=(0, 0, 64 * self.level_width, 64 * self.level_height),
                            xscrollcommand=self.canvas_hbar.set,
@@ -471,7 +481,6 @@ class TilemapView:
 
     def close(self):
         """Tells the view to close"""
-        # TODO: Add save request dialogue
         if not self.saved:
             # If progress is unsaved, ask user if they want to save
             action = messagebox.askyesnocancel("World Builder 2",
@@ -629,6 +638,7 @@ class TilemapView:
 
     def save_to_file(self, file):
         """Saves the level data to a .json file"""
+        # TODO: Test if saved files are actually loadable in engine.
         # No file path has been set
         if file is None:
             file = filedialog.asksaveasfilename(filetypes=[('JSON File', '*.json')],
@@ -667,42 +677,88 @@ class TilemapView:
         cls.imgs = {"border": border_tile_data}
 
 
-class SelectionPane:
+class SelectionPane(tk.Frame):
 
-    def __init__(self, parent):
+    def __init__(self, parent, **kw):
         """Overarching class for the object selection panes"""
-        self.frame = tk.Frame(parent, borderwidth=1, relief=tk.SUNKEN)
-        self.frame.pack(anchor="ne")
-        self.selection_canvas = tk.Canvas(self.frame, width=64 * 3, height=576, bg="WHITE", bd=0)
-        self.selection_canvas.pack()
+        super().__init__(parent, **kw)
+        # Add the tile canvas
+        self.canvas = tk.Canvas(self, width=72 * 3, height=72*8, bg="WHITE", bd=0)
+        self.canvas.grid_propagate(False)
+        self.canvas.grid(row=0, column=0, sticky=tk.NSEW)
+
+        # Add the scrollbars
+        self.canvas_vbar = tk.Scrollbar(self, orient=tk.VERTICAL, command=self.canvas.yview)
+        self.canvas_vbar.grid(row=0, column=1, sticky=tk.NS)
+        self.canvas_vbar.activate("slider")
+        # self.canvas_hbar = tk.Scrollbar(self, orient=tk.HORIZONTAL, command=self.canvas.xview)
+        # self.canvas_hbar.grid(row=1, column=0, sticky=tk.E + tk.W)
+        # self.canvas_hbar.activate("slider")
+        self.canvas.config(scrollregion=(0, 0, 64 * 3, 64 * 16),
+                           # xscrollcommand=self.canvas_hbar.set,
+                           yscrollcommand=self.canvas_vbar.set)
+        self.canvas.xview(tk.MOVETO, 0.0)
+        self.canvas.yview(tk.MOVETO, 0.0)
 
 
 class TilePane(SelectionPane):
 
-    def __init__(self, parent):
+    def __init__(self, parent, **kw):
         """Overarching class for selection panes that are specifically for tiles"""
-        super().__init__(parent)
+        super().__init__(parent, **kw)
 
 
 class TileCollection(TilePane):
 
-    def __init__(self, parent):
+    def __init__(self, parent, group, mode, var, **kw):
         """These are configurable groupings of tiles to make it easier to find specific tiles"""
-        super().__init__(parent)
+        super().__init__(parent, **kw)
+
+        # TODO: Add a configuration option for changing the width of the pane
+        # Iterate through group to declare tile images in a HEIGHT x 3 grid
+        x = 0
+        y = 0
+        for i in group:
+            if x == 3:
+                y += 1
+                x = 0
+            # If mode = "tile" load from tileset.  If mode = "deco" load from decoset
+            if mode == "tile":
+                radiobutton = tk.Radiobutton(self.canvas,
+                                             indicator=0,
+                                             value=i,
+                                             variable=var,
+                                             image=TilemapEditorWindow.tile_dict[i])
+            elif mode == "deco":
+                radiobutton = tk.Radiobutton(self.canvas,
+                                             indicator=0,
+                                             value=i,
+                                             variable=var,
+                                             image=TilemapEditorWindow.deco_dict[i])
+            else:
+                raise ValueError("Cannot initialize TileCollection with unknown mode '{}'."
+                                 "  Options are 'tile' and 'deco'".format(mode))
+
+            # Configure new radiobutton
+            self.canvas.create_window(x * 72 + 36, y * 72 + 36, window=radiobutton)
+            x += 1
+
+        # Configure scroll-region
+        self.canvas.config(scrollregion=self.canvas.bbox("all"))
 
 
 class TileAssembly(SelectionPane):
 
-    def __init__(self, parent):
+    def __init__(self, parent, **kw):
         """These are multi-tile objects that allow one to place structures quickly—like trees, for example"""
-        super().__init__(parent)
+        super().__init__(parent, **kw)
 
 
 class WorldEditorWindow:
 
     def __init__(self, parent):
         # Create the source frame
-        self.frame = tk.Frame(borderwidth=1, relief=tk.SUNKEN)
+        self.frame = tk.Frame(parent, borderwidth=1, relief=tk.SUNKEN)
         self.frame.pack(fill=tk.BOTH, expand=1)
 
         # Create the canvas viewport
@@ -717,7 +773,7 @@ class NotesEditorWindow:
 
     def __init__(self, parent):
         # Create the source frame
-        self.frame = tk.Frame(borderwidth=1, relief=tk.SUNKEN)
+        self.frame = tk.Frame(parent, borderwidth=1, relief=tk.SUNKEN)
         self.frame.pack(fill=tk.BOTH, expand=1)
 
         # Create the text entry

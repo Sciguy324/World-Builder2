@@ -15,9 +15,9 @@ Core Feature Elaboration:
 		-Tile selection pane (right)
 		-Buttons and key shortcuts for:
 			-Draw
-			-Move
-			-Show/hide grid
-			-Toggle border visibility
+			--Move
+			--Show/hide grid
+			--Toggle border visibility
 			-Tilemap layer
 			-Decoration layer
 			-Collision map
