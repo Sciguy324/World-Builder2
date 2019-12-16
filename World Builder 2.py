@@ -503,10 +503,10 @@ class TilemapView:
         """Redraw the entire view"""
         # First redraw the grid if enabled (self.grid=1)
         self.canvas.delete("all")
-        if self.grid:
-            self.draw_grid()
         self.draw_tilemap()
         self.draw_decomap()
+        if self.grid:
+            self.draw_grid()
         if self.border:
             self.draw_border()
 
