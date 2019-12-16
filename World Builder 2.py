@@ -1,5 +1,8 @@
 import tkinter as tk
+import tkinter.filedialog as filedialog
 from tkinter import ttk
+from PIL import ImageTk, Image
+import json
 
 
 class CustomButton(ttk.Button):
@@ -168,6 +171,8 @@ class CustomNotebook(ttk.Notebook):
 
 class TilemapEditorWindow:
     imgs = {}
+    tile_dict = {}
+    deco_dict = {}
     __initialized = False
 
     def __init__(self, parent):
@@ -238,46 +243,31 @@ class TilemapEditorWindow:
         self.selection_pane.grid(row=1, column=2, sticky=tk.E, ipadx=20)
         self.tile_pane_test = TilePane(self.selection_pane)
 
+        # Build the editor window's toolbar
+        self.menubar = tk.Menu(self.frame.master.master.master)
+
+        # Create the file menubar
+        self.filemenu = tk.Menu(self.menubar, tearoff=0)
+        self.filemenu.add_command(label="Open Map (Ctrl-O)", command=self._open_map)
+        self.filemenu.add_command(label="Save Map (Ctrl-S)", command=None)
+        self.filemenu.add_command(label="Save Map As (Ctrl-Shift-S)", command=None)
+        self.filemenu.add_command(label="New Map (Ctrl-N)", command=self.new_view)
+        self.menubar.add_cascade(label="File", menu=self.filemenu)
+
         # Create initial tilemap view
         self.new_view()
 
-    @classmethod
-    def _initialize_images(cls):
-        """Initialize all of the PhotoImages"""
-        addnew_data = '''R0lGODlhCgAKAMIDAAAvAACQAACzAE3bO03bO03bO03bO03bOyH5BA
-            EKAAQALAAAAAAKAAoAAAMg\nSAoRoJAwF5cQb4F9927XMFwNKIik43UeBHSV1GTRRCc
-            AOw==
-            '''
+    def _open_map(self, event=None):
+        """Event callback for opening a level"""
+        file = filedialog.askopenfilename(filetypes=[("Json", "*.json")], defaultextension=[("Json", "*.json")])
+        self.open_map(file)
 
-        draw_tool_data = '''R0lGODlhIAAgAKEBAAAAAP///////////yH5BAEKAAIALAAAAAAg
-            ACAAAAJdlI+py+0PH5ixChAy\nsHLmsHHLRIKhiJAqhR6r2rrfGhvYZ57tPbMxr/HtcL
-            nahUgyAou1ZbKJFKKcUhFVN41irVplF4p7\n/oDinSe45dw85SE6bV1XzTCjq27P6y0F
-            ADs=
-            '''
+    def open_map(self, file):
+        """Open a level in a new view"""
+        self.new_view()
+        self.view_list[self.tilemap_panel.index("current")].load_from_file(file)
 
-        move_tool_data = '''R0lGODlhIAAgAIABAAAAAP///yH5BAEKAAEALAAAAAAgACAAAAJa
-            jI+py+0PAwCxmjktxFg3znkK\nCIpLaDJoOnZsm5kUPCe1eh8rEp8977L9dKSicSc5Ko
-            3ApTN4eTp9uejQ+qkmr8mHFnlJgV9jVlkM\nNR9f2xK7zUXH1e+6HVEAADs=
-            '''
-
-        grid_mode_data = '''R0lGODlhIAAgAIABAAAAAP///yH5BAEKAAEALAAAAAAgACAAAAJV
-            hI+py+0foolhSkBtxVd7vmXg\n94nmdW7PyrbuCKdlF6N2eCNyjffvD/zthrkD0cfTFY
-            +koPOZYCZhM6S0ip1Ct0/pdeqlha00rtk1\nzmbTxqUbeY4/CgA7
-            '''
-
-        border_mode_data = '''R0lGODlhIAAgAIABAAAAAP///yH5BAEKAAEALAAAAAAgACAAAA
-            JChI+py+0Po5y0woCz3jy4DnZf\nSGJjGZ6o2Kxp67JMLC80p94erJt8n7sFacNY0XVc
-            JVHLUpP0fM16Pov1is1qt5QCADs=
-            '''
-
-        cls.imgs = {"add_new": tk.PhotoImage("img_addnew_active", data=addnew_data),
-                    "draw": tk.PhotoImage("img_draw_tool", data=draw_tool_data),
-                    "move": tk.PhotoImage("img_move_tool", data=move_tool_data),
-                    "grid": tk.PhotoImage("img_grid_mode", data=grid_mode_data),
-                    "border": tk.PhotoImage("img_border_mode", data=border_mode_data)}
-        cls.__initialized = True
-
-    def new_view(self):
+    def new_view(self, event=None):
         """Create a new, blank view"""
         # Create new view instance
         self.view_list.append(TilemapView(self.tilemap_panel,
@@ -336,6 +326,69 @@ class TilemapEditorWindow:
         else:
             self.border_mode.set(0)
 
+    @classmethod
+    def _initialize_images(cls):
+        """Initialize all of the PhotoImages"""
+        # Declare embedded image data
+        addnew_data = '''R0lGODlhCgAKAMIDAAAvAACQAACzAE3bO03bO03bO03bO03bOyH5BA
+            EKAAQALAAAAAAKAAoAAAMg\nSAoRoJAwF5cQb4F9927XMFwNKIik43UeBHSV1GTRRCc
+            AOw==
+            '''
+
+        draw_tool_data = '''R0lGODlhIAAgAKEBAAAAAP///////////yH5BAEKAAIALAAAAAAg
+            ACAAAAJdlI+py+0PH5ixChAy\nsHLmsHHLRIKhiJAqhR6r2rrfGhvYZ57tPbMxr/HtcL
+            nahUgyAou1ZbKJFKKcUhFVN41irVplF4p7\n/oDinSe45dw85SE6bV1XzTCjq27P6y0F
+            ADs=
+            '''
+
+        move_tool_data = '''R0lGODlhIAAgAIABAAAAAP///yH5BAEKAAEALAAAAAAgACAAAAJa
+            jI+py+0PAwCxmjktxFg3znkK\nCIpLaDJoOnZsm5kUPCe1eh8rEp8977L9dKSicSc5Ko
+            3ApTN4eTp9uejQ+qkmr8mHFnlJgV9jVlkM\nNR9f2xK7zUXH1e+6HVEAADs=
+            '''
+
+        grid_mode_data = '''R0lGODlhIAAgAIABAAAAAP///yH5BAEKAAEALAAAAAAgACAAAAJV
+            hI+py+0foolhSkBtxVd7vmXg\n94nmdW7PyrbuCKdlF6N2eCNyjffvD/zthrkD0cfTFY
+            +koPOZYCZhM6S0ip1Ct0/pdeqlha00rtk1\nzmbTxqUbeY4/CgA7
+            '''
+
+        border_mode_data = '''R0lGODlhIAAgAIABAAAAAP///yH5BAEKAAEALAAAAAAgACAAAA
+            JChI+py+0Po5y0woCz3jy4DnZf\nSGJjGZ6o2Kxp67JMLC80p94erJt8n7sFacNY0XVc
+            JVHLUpP0fM16Pov1is1qt5QCADs=
+            '''
+
+        # Add embedded images to the image dictionary
+        cls.imgs = {"add_new": tk.PhotoImage("img_addnew_active", data=addnew_data),
+                    "draw": tk.PhotoImage("img_draw_tool", data=draw_tool_data),
+                    "move": tk.PhotoImage("img_move_tool", data=move_tool_data),
+                    "grid": tk.PhotoImage("img_grid_mode", data=grid_mode_data),
+                    "border": tk.PhotoImage("img_border_mode", data=border_mode_data)}
+
+        # Open the ids.json file to start loading the tiles/decos
+        try:
+            # Attempt to read data from file
+            with open("assets/ids.json", mode="r") as f:
+                file_data = json.load(f)
+                # Load the tiles
+                for i in file_data["tile_ids"]:
+                    img = Image.open("tiles/" + i["tex"])
+                    img = img.crop([0, 0, 16, 16])
+                    img = img.resize((64, 64))
+                    cls.tile_dict[int(i["id"])] = ImageTk.PhotoImage(img)
+
+                # Load the decos
+                for i in file_data["deco_ids"]:
+                    img = Image.open("tiles/" + i["tex"])
+                    img = img.crop([0, 0, 16, 16])
+                    img = img.resize((64, 64))
+                    cls.deco_dict[int(i["id"])] = ImageTk.PhotoImage(img)
+
+        except FileNotFoundError:
+            # If the file does not exist, create a new one
+            with open("assets/ids.json", mode="w") as f:
+                pass
+
+        cls.__initialized = True
+
 
 class TilemapView:
     # TODO: Tkinterify TilemapView, and make it the responsibility of a subclass of CustomNotebook
@@ -353,15 +406,20 @@ class TilemapView:
         if not TilemapView.__initialized:
             TilemapView._initialize()
 
-        # Declare some variables
+        # Declare some variables for view settings
         self.start_x = 0
         self.start_y = 0
-        self.level_width = 16 + 2
-        self.level_height = 9 + 2
         self.saved = False
-        self.name = "Untitled"
         self.grid = grid_scheme
         self.border = border_scheme
+
+        # Declare some variables related to the tilemap itself
+        self.name = "Untitled"
+        self.level_width = 16 + 2
+        self.level_height = 9 + 2
+        self.tilemap = [[0] * self.level_width for i in range(self.level_height)]
+        self.decomap = [[0] * self.level_width for i in range(self.level_height)]
+        self.file_path = ""
 
         # Create element layout
         self.frame = tk.Frame(parent, borderwidth=1, relief=tk.SUNKEN)
@@ -381,16 +439,20 @@ class TilemapView:
         self.canvas.xview(tk.MOVETO, 0.0)
         self.canvas.yview(tk.MOVETO, 0.0)
 
-        # Set up some controls
+        # Set up some event handlers
         self.frame.bind("<<TilemapEditorUpdateMode>>", self._set_mode)
-        self.frame.bind("<<TilemapEditorGridToggle>>", self.set_grid)
+        self.frame.bind("<<TilemapEditorGridToggle>>", self._set_grid)
         self.frame.bind("<<TilemapEditorBorderToggle>>", self._set_border)
         self.frame.bind("<<TilemapEditorForceRedraw>>", self.redraw_view)
-        self.set_mode(control_scheme)
 
         # Add the view to the parent frame
         parent.add(self.frame)
         self.update_title()
+
+        # Ensure settings are set
+        self.set_mode(control_scheme)
+        self.set_grid(grid_scheme)
+        self.set_border(border_scheme)
 
         # Draw the entire view
         self.redraw_view()
@@ -400,9 +462,10 @@ class TilemapView:
         # TODO: Add save request dialogue
         if not self.saved:
             print("WARNING: NOT SAVED")
-        self.frame.unbind("<<TilemapEditorUpdateMode>>")
-        self.frame.unbind("<<TilemapEditorGridToggle>>")
-        self.frame.unbind("<<TilemapEditorBorderToggle>>")
+        self.frame.unbind_all(["<<TilemapEditorUpdateMode>>",
+                               "<<TilemapEditorGridToggle>>",
+                               "<<TilemapEditorBorderToggle>>",
+                               "<<TilemapEditorForceRedraw>>"])
         self.frame.forget()
         return True
 
@@ -415,9 +478,17 @@ class TilemapView:
 
     def draw_tilemap(self):
         """Draw the current level"""
-        # TODO: Add functionality to "draw_tilemap"
-        print("There is no tilemap")
-        pass
+        for i, j in enumerate(self.tilemap):
+            for k, m in enumerate(j):
+                if m != 0:
+                    self.canvas.create_image((k * 64 + 32, i * 64 + 32), image=TilemapEditorWindow.tile_dict[m])
+
+    def draw_decomap(self):
+        """Draw the current level"""
+        for i, j in enumerate(self.decomap):
+            for k, m in enumerate(j):
+                if m != 0:
+                    self.canvas.create_image((k * 64 + 32, i * 64 + 32), image=TilemapEditorWindow.deco_dict[m])
 
     def draw_border(self):
         """Draw the border"""
@@ -435,6 +506,7 @@ class TilemapView:
         if self.grid:
             self.draw_grid()
         self.draw_tilemap()
+        self.draw_decomap()
         if self.border:
             self.draw_border()
 
@@ -464,9 +536,12 @@ class TilemapView:
             self.canvas.bind("<B1-Motion>", self.move)
             self.canvas.config(cursor="fleur")
 
-    def set_grid(self, event):
+    def _set_grid(self, event):
+        self.set_grid(event.x)
+
+    def set_grid(self, value):
         """Toggle the grid overlay"""
-        self.grid = event.x
+        self.grid = value
         self.redraw_view()
 
     def _set_border(self, event):
@@ -504,6 +579,19 @@ class TilemapView:
             self.start_y = None
         self.canvas.scan_dragto(event.x, event.y, gain=1)
 
+    def load_from_file(self, file):
+        with open(file, mode="r") as f:
+            level_data = json.load(f)
+            self.tilemap = level_data["tilemap"]
+            self.decomap = level_data["decomap"]
+            self.level_height = len(self.tilemap)
+            self.level_width = len(self.tilemap[0])
+            self.name = level_data["name"]
+            self.saved = True
+        self.set_border(self.border)
+        self.update_title()
+        self.redraw_view()
+
     @classmethod
     def _initialize(cls):
         """Initialize the embedded images"""
@@ -523,7 +611,6 @@ class SelectionPane:
         self.frame.pack(anchor="ne")
         self.selection_canvas = tk.Canvas(self.frame, width=64 * 3, height=576, bg="WHITE", bd=0)
         self.selection_canvas.pack()
-        pass
 
 
 class TilePane(SelectionPane):
@@ -621,6 +708,24 @@ class App:
         self.notepad = NotesEditorWindow(self.source)
 
         self.source.pack(expand=1, fill="both")
+
+        # Add toolbar
+        self.menubar = tk.Menu(parent)
+
+        # Add event listener to update the toolbar
+        self.source.bind("<<NotebookTabChanged>>", self._update_toolbar)
+
+    def _update_toolbar(self, event):
+        """Callback event handler for updating the toolbar to match the current tab"""
+        self.update_toolbar(self.source.index("current"))
+
+    def update_toolbar(self, value):
+        """Updates the toolbar to match the current tab"""
+        self.menubar.forget()
+        self.menubar = tk.Menu(self.source.master)
+        # Tilemap editor window toolbar
+        if value == 0:
+            self.source.master.config(menu=self.tilemap_editor.menubar)
 
 
 if __name__ == "__main__":

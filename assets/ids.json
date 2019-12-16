@@ -1,0 +1,521 @@
+{
+  "tile_ids": [
+    {
+      "id": 0,
+      "tex": "missing.png"
+    },
+    {
+      "id": 1,
+      "tex": "block.png"
+    },
+    {
+      "id": 2,
+      "tex": "stone_table_top.png"
+    },
+    {
+      "id": 3,
+      "tex": "stone_table_left.png"
+    },
+    {
+      "id": 4,
+      "tex": "stone_table_right.png"
+    },
+    {
+      "id": 5,
+      "tex": "stone_table_bottom.png"
+    },
+    {
+      "id": 6,
+      "tex": "stone_wall.png"
+    },
+    {
+      "id": 7,
+      "tex": "void.png"
+    },
+    {
+      "id": 8,
+      "tex": "wood.png"
+    },
+    {
+      "id": 9,
+      "tex": "grass.png"
+    },
+    {
+      "id": 10,
+      "tex": "corner.png"
+    },
+    {
+      "id": 11,
+      "tex": "wall.png"
+    },
+    {
+      "id": 12,
+      "tex": "top_left_water.png"
+    },
+    {
+      "id": 13,
+      "tex": "top_water.png"
+    },
+    {
+      "id": 14,
+      "tex": "top_right_water.png"
+    },
+    {
+      "id": 15,
+      "tex": "left_water.png"
+    },
+    {
+      "id": 16,
+      "tex": "water.png"
+    },
+    {
+      "id": 17,
+      "tex": "right_water.png"
+    },
+    {
+      "id": 18,
+      "tex": "bottom_left_water.png"
+    },
+    {
+      "id": 19,
+      "tex": "bottom_water.png"
+    },
+    {
+      "id": 20,
+      "tex": "bottom_right_water.png"
+    },
+    {
+      "id": 21,
+      "tex": "grass3.png"
+    },
+    {
+      "id": 22,
+      "tex": "grass2.png"
+    },
+    {
+      "id": 23,
+      "tex": "pink_wall.png"
+    },
+    {
+      "id": 24,
+      "tex": "top_left_path.png"
+    },
+    {
+      "id": 25,
+      "tex": "top_path.png"
+    },
+    {
+      "id": 26,
+      "tex": "top_right_path.png"
+    },
+    {
+      "id": 27,
+      "tex": "left_path.png"
+    },
+    {
+      "id": 28,
+      "tex": "path.png"
+    },
+    {
+      "id": 29,
+      "tex": "right_path.png"
+    },
+    {
+      "id": 30,
+      "tex": "bottom_left_path.png"
+    },
+    {
+      "id": 31,
+      "tex": "bottom_path.png"
+    },
+    {
+      "id": 32,
+      "tex": "bottom_right_path.png"
+    },
+    {
+      "id": 33,
+      "tex": "path_corner1.png"
+    },
+    {
+      "id": 34,
+      "tex": "path_corner2.png"
+    },
+    {
+      "id": 35,
+      "tex": "path_corner3.png"
+    },
+    {
+      "id": 36,
+      "tex": "path_corner4.png"
+    },
+    {
+      "id": 37,
+      "tex": "water_corner1.png"
+    },
+    {
+      "id": 38,
+      "tex": "water_corner2.png"
+    },
+    {
+      "id": 39,
+      "tex": "water_corner3.png"
+    },
+    {
+      "id": 40,
+      "tex": "water_corner4.png"
+    },
+    {
+      "id": 41,
+      "tex": "cliff_top_left.png"
+    },
+    {
+      "id": 42,
+      "tex": "cliff_top.png"
+    },
+    {
+      "id": 43,
+      "tex": "cliff_top_right.png"
+    },
+    {
+      "id": 44,
+      "tex": "cliff_face_left.png"
+    },
+    {
+      "id": 45,
+      "tex": "cliff_center.png"
+    },
+    {
+      "id": 46,
+      "tex": "cliff_face_right.png"
+    },
+    {
+      "id": 47,
+      "tex": "cliff_bottom_left.png"
+    },
+    {
+      "id": 48,
+      "tex": "cliff_bottom.png"
+    },
+    {
+      "id": 49,
+      "tex": "cliff_bottom_right.png"
+    },
+    {
+      "id": 50,
+      "tex": "cliff_left.png"
+    },
+    {
+      "id": 51,
+      "tex": "cliff_back.png"
+    },
+    {
+      "id": 52,
+      "tex": "cliff_right.png"
+    },
+    {
+      "id": 53,
+      "tex": "cliff_left_corner.png"
+    },
+    {
+      "id": 54,
+      "tex": "cliff_right_corner.png"
+    },
+    {
+      "id": 55,
+      "tex": "cliff_stairs_top.png"
+    },
+    {
+      "id": 56,
+      "tex": "cliff_stairs.png"
+    },
+    {
+      "id": 57,
+      "tex": "cliff_stairs_bottom.png"
+    },
+    {
+      "id": 58,
+      "tex": "lamp_post_bottom.png"
+    },
+    {
+      "id": 59,
+      "tex": "table.png"
+    },
+    {
+      "id": 60,
+      "tex": "table_left.png"
+    },
+    {
+      "id": 61,
+      "tex": "table_center.png"
+    },
+    {
+      "id": 62,
+      "tex": "table_right.png"
+    },
+    {
+      "id": 63,
+      "tex": "table_bottom_left.png"
+    },
+    {
+      "id": 64,
+      "tex": "table_bottom.png"
+    },
+    {
+      "id": 65,
+      "tex": "table_bottom_right.png"
+    },
+    {
+      "id": 66,
+      "tex": "door_bottom.png"
+    },
+    {
+      "id": 67,
+      "tex": "door_top.png"
+    },
+    {
+      "id": 68,
+      "tex": "bricks_left.png"
+    },
+    {
+      "id": 69,
+      "tex": "bricks.png"
+    },
+    {
+      "id": 70,
+      "tex": "bricks_right.png"
+    },
+    {
+      "id": 71,
+      "tex": "bricks_bottom_left.png"
+    },
+    {
+      "id": 72,
+      "tex": "bricks_bottom.png"
+    },
+    {
+      "id": 73,
+      "tex": "bricks_bottom_right.png"
+    },
+    {
+      "id": 74,
+      "tex": "window.png"
+    },
+    {
+      "id": 75,
+      "tex": "pink_wall_base.png"
+    },
+    {
+      "id": 76,
+      "tex": "white_green_wall_base_rimmed.png"
+    },
+    {
+      "id": 77,
+      "tex": "white_green_wall_painting_base.png"
+    },
+    {
+      "id": 78,
+      "tex": "drawer.png"
+    },
+    {
+      "id": 79,
+      "tex": "white_green_wall_base_drawer.png"
+    },
+    {
+      "id": 80,
+      "tex": "drawer_legs.png"
+    },
+    {
+      "id": 81,
+      "tex": "white_green_wall_base_left.png"
+    },
+    {
+      "id": 82,
+      "tex": "white_green_wall_base.png"
+    },
+    {
+      "id": 83,
+      "tex": "white_green_wall_base_right.png"
+    },
+    {
+      "id": 84,
+      "tex": "tree_trunk.png"
+    },
+    {
+      "id": 85,
+      "tex": "water2.png"
+    },
+    {
+      "id": 86,
+      "tex": "water_ripple.png"
+    },
+    {
+      "id": 87,
+      "tex": "wood_shade.png"
+    }
+
+  ],
+  "deco_ids": [
+    {
+      "id": 0,
+      "tex": "box.png",
+      "height": 1
+    },
+    {
+      "id": 1,
+      "tex": "lamp_post_top.png",
+      "height": 2
+    },
+    {
+      "id": 2,
+      "tex": "table_top_left.png",
+      "height": 1
+    },
+    {
+      "id": 3,
+      "tex": "table_top.png",
+      "height": 1
+    },
+    {
+      "id": 4,
+      "tex": "table_top_right.png",
+      "height": 1
+    },
+    {
+      "id": 5,
+      "tex": "roof_right_bottom.png",
+      "height": 1
+    },
+    {
+      "id": 6,
+      "tex": "roof_right_middle1.png",
+      "height": 1
+    },
+    {
+      "id": 7,
+      "tex": "roof_right_middle2.png",
+      "height": 1
+    },
+    {
+      "id": 8,
+      "tex": "roof_right_top.png",
+      "height": 1
+    },
+    {
+      "id": 9,
+      "tex": "roof_left_bottom.png",
+      "height": 1
+    },
+    {
+      "id": 10,
+      "tex": "roof_left_middle1.png",
+      "height": 1
+    },
+    {
+      "id": 11,
+      "tex": "roof_left_middle2.png",
+      "height": 1
+    },
+    {
+      "id": 12,
+      "tex": "roof_left_top.png",
+      "height": 1
+    },
+    {
+      "id": 13,
+      "tex": "roof_top1.png",
+      "height": 1
+    },
+    {
+      "id": 14,
+      "tex": "roof_top2.png",
+      "height": 1
+    },
+    {
+      "id": 15,
+      "tex": "top_roof_shadow.png",
+      "height": 1
+    },
+    {
+      "id": 16,
+      "tex": "pink_wall_top.png",
+      "height": 1
+    },
+    {
+      "id": 17,
+      "tex": "white_green_wall_top_rimmed.png",
+      "height": 1
+    },
+    {
+      "id": 18,
+      "tex": "white_green_wall_painting_top.png",
+      "height": 1
+    },
+    {
+      "id": 19,
+      "tex": "white_green_wall_clock.png",
+      "height": 1
+    },
+    {
+      "id": 20,
+      "tex": "lamp.png",
+      "height": 1
+    },
+    {
+      "id": 21,
+      "tex": "white_green_wall_top_left.png",
+      "height": 1
+    },
+    {
+      "id": 22,
+      "tex": "white_green_wall_top.png",
+      "height": 1
+    },
+    {
+      "id": 23,
+      "tex": "white_green_wall_top_right.png",
+      "height": 1
+    },
+    {
+      "id": 24,
+      "tex": "roof_right_edge.png",
+      "height": 4
+    },
+    {
+      "id": 25,
+      "tex": "roof_left_edge.png",
+      "height": 4
+    },
+    {
+      "id": 26,
+      "tex": "tree_top_left.png",
+      "height": 3
+    },
+    {
+      "id": 27,
+      "tex": "tree_top.png",
+      "height": 3
+    },
+    {
+      "id": 29,
+      "tex": "tree_mid_left.png",
+      "height": 2
+    },
+    {
+      "id": 28,
+      "tex": "tree_top_right.png",
+      "height": 3
+    },
+    {
+      "id": 30,
+      "tex": "tree_mid.png",
+      "height": 2
+    },
+    {
+      "id": 31,
+      "tex": "tree_mid_right.png",
+      "height": 2
+    }
+
+  ],
+  "colliders": [ 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 23, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 58, 59, 63, 65, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 79, 81, 82, 83, 84 ]
+}
