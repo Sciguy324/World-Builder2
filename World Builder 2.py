@@ -183,8 +183,11 @@ class TilemapEditorWindow:
         if not TilemapEditorWindow.__initialized:
             TilemapEditorWindow._initialize_images()
 
-        # Create a lookup dictionary of the available views
+        # Create a lookup list of the available views
         self.view_list = []
+
+        # Create a lookup dictionary of the available tile panes
+        self.tile_panes = {}
 
         # Add editor to parent window
         self.frame = ttk.Frame(parent)
@@ -206,6 +209,7 @@ class TilemapEditorWindow:
 
         # Add the tile ID tracking variable
         self.tile_id = tk.IntVar(self.frame, 0, "selected_tile")
+        self.tile_id.trace("w", self.tile_id_callback)
 
         # Add buttons panel
         self.buttons_bar = ttk.Frame(self.frame)
@@ -246,14 +250,14 @@ class TilemapEditorWindow:
         # Add the Selection panes
         self.selection_frame = ttk.Frame(self.frame)
         self.selection_frame.grid(row=1, column=2, sticky=tk.E, ipadx=20)
-        self.tile_pane = TileCollection(self.selection_frame,
-                                        [i for i, j in TilemapEditorWindow.tile_dict.items()],
-                                        "tile",
-                                        self.tile_id,
-                                        borderwidth=1,
-                                        relief=tk.SUNKEN)
-        self.tile_pane.grid(row=1, column=2, sticky=tk.E, ipadx=20)
-        self.tile_pane.pack(anchor="ne")
+        # Add the "all" categories
+        self.tile_panes = {"all": TileCollection(self.selection_frame,
+                                                 [i for i, j in TilemapEditorWindow.tile_dict.items()],
+                                                 "tile",
+                                                 self.tile_id,
+                                                 borderwidth=1,
+                                                 relief=tk.SUNKEN)}
+        self.set_pane("all")
 
         # Build the editor window's toolbar
         self.menubar = tk.Menu(self.frame.master.master.master)
@@ -323,6 +327,11 @@ class TilemapEditorWindow:
         for i in self.view_list:
             i.frame.event_generate("<<TilemapEditorBorderToggle>>", x=self.border_mode.get())
 
+    def tile_id_callback(self, name=None, index=None, op=None):
+        """Callback to set the grid visibility of the views"""
+        for i in self.view_list:
+            i.frame.event_generate("<<TilemapEditorUpdateID>>", x=self.tile_id.get())
+
     def keybind_draw_mode(self, event):
         """Callback for setting the editor to draw mode"""
         self.tool_mode.set(0)
@@ -344,6 +353,12 @@ class TilemapEditorWindow:
             self.border_mode.set(1)
         else:
             self.border_mode.set(0)
+
+    def set_pane(self, pane):
+        """Set the currently viewable pane"""
+        for i, j in self.tile_panes.items():
+            j.pack_forget()
+        self.tile_panes[pane].pack(anchor="ne")
 
     @classmethod
     def _initialize_images(cls):
@@ -431,6 +446,7 @@ class TilemapView:
         self.saved = False
         self.grid = grid_scheme
         self.border = border_scheme
+        self.current_tile = 0
 
         # Declare some variables related to the tilemap itself
         self.name = "Untitled"
@@ -466,6 +482,7 @@ class TilemapView:
         self.frame.bind("<<TilemapEditorGridToggle>>", self._set_grid)
         self.frame.bind("<<TilemapEditorBorderToggle>>", self._set_border)
         self.frame.bind("<<TilemapEditorForceRedraw>>", self.redraw_view)
+        self.frame.bind("<<TilemapEditorUpdateID>>", self.set_id)
 
         # Add the view to the parent frame
         parent.add(self.frame)
@@ -505,8 +522,10 @@ class TilemapView:
         self.frame.forget()
         return True
 
-    def draw_grid(self):
+    def draw_grid(self, event=None):
         """Draw the tilemap grid"""
+        if not self.grid:
+            return
         for i in range(self.level_width + 1):
             self.canvas.create_line(64 * i, 0, 64 * i, 64 * self.level_height, fill="BLACK", width=2.0)
         for i in range(self.level_height + 1):
@@ -526,7 +545,7 @@ class TilemapView:
                 if m != 0:
                     self.canvas.create_image((k * 64 + 32, i * 64 + 32), image=TilemapEditorWindow.deco_dict[m])
 
-    def draw_border(self):
+    def draw_border(self, event=None):
         """Draw the border"""
         for i in range(self.level_width):
             self.canvas.create_image((i * 64 + 32, 32), image=TilemapView.imgs["border"])
@@ -546,6 +565,10 @@ class TilemapView:
         if self.border:
             self.draw_border()
 
+    def set_id(self, event):
+        """Event callback to update the current tile ID"""
+        self.current_tile = event.x
+
     def update_title(self):
         """Update the title of the view"""
         # If not saved, add an asterisk in front of the displayed name
@@ -562,12 +585,14 @@ class TilemapView:
         """Does the actual work of setting the window's mode"""
         if value == 0:
             # Drawing controls
-            self.canvas.unbind_all(["<ButtonPress-1>", "<B1-Motion>"])
-            self.canvas.bind("<B1-Motion>", self.draw)
+            self.canvas.unbind_all(["<ButtonPress-1>", "<B1-Motion>", "<ButtonRelease-1>"])
+            self.canvas.bind("<ButtonRelease-1>", self.draw_tile)
+            self.canvas.bind("<ButtonRelease-1>", self.draw_grid)
+            self.canvas.bind("<B1-Motion>", self.draw_tile)
             self.canvas.config(cursor="pencil")
         elif value == 1:
             # Movement controls
-            self.canvas.unbind_all(["<ButtonPress-1>", "<B1-Motion>"])
+            self.canvas.unbind_all(["<ButtonPress-1>", "<B1-Motion>", "<ButtonRelease-1>"])
             self.canvas.bind("<ButtonPress-1>", self.set_start)
             self.canvas.bind("<B1-Motion>", self.move)
             self.canvas.config(cursor="fleur")
@@ -597,10 +622,21 @@ class TilemapView:
             self.canvas.config(scrollregion=(64, 64, 64 * (self.level_width - 1), 64 * (self.level_height - 1)))
         self.redraw_view()
 
-    def draw(self, event):
-        """Event callback for drawing on the grid"""
-        # TODO: Add drawing capability
-        pass
+    def draw_tile(self, event):
+        """Event callback for drawing a tile on the grid"""
+        # Draw the tile
+        tile_x = max(int(self.canvas.xview()[0] * len(self.tilemap[0]) + event.x / 64), 0)
+        tile_y = max(int(self.canvas.yview()[0] * len(self.tilemap) + event.y / 64), 0)
+        if not self.border:
+            tile_x += 1
+            tile_y += 1
+        self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
+                                 image=TilemapEditorWindow.tile_dict[self.current_tile])
+        # Add the tile to the tilemap matrix
+        try:
+            self.tilemap[tile_y][tile_x] = int(self.current_tile)
+        except IndexError:
+            pass
 
     def set_start(self, event):
         """Set the starting position for dragging the canvas around"""
@@ -683,7 +719,7 @@ class SelectionPane(tk.Frame):
         """Overarching class for the object selection panes"""
         super().__init__(parent, **kw)
         # Add the tile canvas
-        self.canvas = tk.Canvas(self, width=72 * 3, height=72*8, bg="WHITE", bd=0)
+        self.canvas = tk.Canvas(self, width=72 * 3, height=72 * 8, bg="WHITE", bd=0)
         self.canvas.grid_propagate(False)
         self.canvas.grid(row=0, column=0, sticky=tk.NSEW)
 
@@ -700,12 +736,49 @@ class SelectionPane(tk.Frame):
         self.canvas.xview(tk.MOVETO, 0.0)
         self.canvas.yview(tk.MOVETO, 0.0)
 
+        # Declare positional variables
+        self.current_x = 0
+        self.current_y = 0
+
+    def add_option(self, *args):
+        """Base function to add a new entry to the selection pane.  Override in subclass"""
+        pass
+
 
 class TilePane(SelectionPane):
 
     def __init__(self, parent, **kw):
         """Overarching class for selection panes that are specifically for tiles"""
+        self.var_ref = None
         super().__init__(parent, **kw)
+
+    def add_option(self, value, mode):
+        """Base function to add a new tile to the selection pane"""
+        # Correct next position
+        if self.current_x == 3:
+            self.current_y += 1
+            self.current_x = 0
+
+        # If mode = "tile" load from tileset.  If mode = "deco" load from decoset
+        if mode == "tile":
+            radiobutton = tk.Radiobutton(self.canvas,
+                                         indicator=0,
+                                         value=value,
+                                         variable=self.var_ref,
+                                         image=TilemapEditorWindow.tile_dict[value])
+        elif mode == "deco":
+            radiobutton = tk.Radiobutton(self.canvas,
+                                         indicator=0,
+                                         value=value,
+                                         variable=self.var_ref,
+                                         image=TilemapEditorWindow.deco_dict[value])
+        else:
+            raise ValueError("Cannot initialize TileCollection with unknown mode '{}'."
+                             "  Options are 'tile' and 'deco'".format(mode))
+
+        # Configure new radiobutton
+        self.canvas.create_window(self.current_x * 72 + 36, self.current_y * 72 + 36, window=radiobutton)
+        self.current_x += 1
 
 
 class TileCollection(TilePane):
@@ -714,14 +787,15 @@ class TileCollection(TilePane):
         """These are configurable groupings of tiles to make it easier to find specific tiles"""
         super().__init__(parent, **kw)
 
+        # Save a reference to the tracker variable
+        self.var_ref = var
+
         # TODO: Add a configuration option for changing the width of the pane
         # Iterate through group to declare tile images in a HEIGHT x 3 grid
-        x = 0
-        y = 0
         for i in group:
-            if x == 3:
-                y += 1
-                x = 0
+            if self.current_x == 3:
+                self.current_y += 1
+                self.current_x = 0
             # If mode = "tile" load from tileset.  If mode = "deco" load from decoset
             if mode == "tile":
                 radiobutton = tk.Radiobutton(self.canvas,
@@ -740,8 +814,8 @@ class TileCollection(TilePane):
                                  "  Options are 'tile' and 'deco'".format(mode))
 
             # Configure new radiobutton
-            self.canvas.create_window(x * 72 + 36, y * 72 + 36, window=radiobutton)
-            x += 1
+            self.canvas.create_window(self.current_x * 72 + 36, self.current_y * 72 + 36, window=radiobutton)
+            self.current_x += 1
 
         # Configure scroll-region
         self.canvas.config(scrollregion=self.canvas.bbox("all"))
