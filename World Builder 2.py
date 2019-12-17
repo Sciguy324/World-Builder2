@@ -524,8 +524,6 @@ class TilemapView:
 
     def draw_grid(self, event=None):
         """Draw the tilemap grid"""
-        if not self.grid:
-            return
         for i in range(self.level_width + 1):
             self.canvas.create_line(64 * i, 0, 64 * i, 64 * self.level_height, fill="BLACK", width=2.0)
         for i in range(self.level_height + 1):
@@ -586,16 +584,21 @@ class TilemapView:
         if value == 0:
             # Drawing controls
             self.canvas.unbind_all(["<ButtonPress-1>", "<B1-Motion>", "<ButtonRelease-1>"])
-            self.canvas.bind("<ButtonRelease-1>", self.draw_tile)
-            self.canvas.bind("<ButtonRelease-1>", self.draw_grid)
+            self.canvas.bind("<ButtonRelease-1>", self._draw_tile_and_grid)
             self.canvas.bind("<B1-Motion>", self.draw_tile)
             self.canvas.config(cursor="pencil")
         elif value == 1:
             # Movement controls
-            self.canvas.unbind_all(["<ButtonPress-1>", "<B1-Motion>", "<ButtonRelease-1>"])
+            self.canvas.unbind("<ButtonRelease-1>")  # Manually unbind event because I don't know
+            self.canvas.unbind_all(["<ButtonRelease-1>", "<ButtonPress-1>", "<B1-Motion>"])
             self.canvas.bind("<ButtonPress-1>", self.set_start)
             self.canvas.bind("<B1-Motion>", self.move)
             self.canvas.config(cursor="fleur")
+
+    def _draw_tile_and_grid(self, event):
+        self.canvas.delete("all")
+        self.draw_tile(event)
+        self.redraw_view()
 
     def _set_grid(self, event):
         self.set_grid(event.x)
