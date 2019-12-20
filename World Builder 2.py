@@ -627,12 +627,26 @@ class TilemapView:
 
     def draw_tile(self, event):
         """Event callback for drawing a tile on the grid"""
-        # Draw the tile
-        tile_x = max(int(self.canvas.xview()[0] * len(self.tilemap[0]) + event.x / 64), 0)
-        tile_y = max(int(self.canvas.yview()[0] * len(self.tilemap) + event.y / 64), 0)
+        # Determine the position at which to to draw the tile
+        tile_x = int(self.canvas.xview()[0] * len(self.tilemap[0]) + event.x / 64)
+
+        tile_y = int(self.canvas.yview()[0] * len(self.tilemap) + event.y / 64)
+
         if not self.border:
             tile_x += 1
             tile_y += 1
+
+        # Check to make sure tile is actually on the screen.  If not, cancel drawing.
+        if event.y / 64 < int(self.canvas.yview()[0] * len(self.tilemap)):
+            return
+        if event.y / 64 + 0.1 > int(self.canvas.yview()[1] * len(self.tilemap) - 1 - int(not self.border)):
+            return
+        if event.x / 64 < int(self.canvas.xview()[0] * len(self.tilemap[0])):
+            return
+        if event.x / 64 + 0.1 > int(self.canvas.xview()[1] * len(self.tilemap[0]) - 1 - int(not self.border)):
+            return
+
+        # Draw the tile
         self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
                                  image=TilemapEditorWindow.tile_dict[self.current_tile])
         # Add the tile to the tilemap matrix
