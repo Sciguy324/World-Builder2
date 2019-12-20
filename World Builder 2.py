@@ -211,6 +211,10 @@ class TilemapEditorWindow:
         self.tile_id = tk.IntVar(self.frame, 0, "selected_tile")
         self.tile_id.trace("w", self.tile_id_callback)
 
+        # Add the group tracking variable
+        self.group = tk.StringVar(self.frame, "", "selected_group")
+        self.group.trace("w", self._set_pane)
+
         # Add buttons panel
         self.buttons_bar = ttk.Frame(self.frame)
         self.buttons_bar.grid(row=0, column=1, sticky=tk.NW, pady=4)
@@ -250,14 +254,13 @@ class TilemapEditorWindow:
         # Add the Selection panes
         self.selection_frame = ttk.Frame(self.frame)
         self.selection_frame.grid(row=1, column=2, sticky=tk.E, ipadx=20)
-        # Add the "all" categories
-        self.tile_panes = {"all": TileCollection(self.selection_frame,
-                                                 [i for i, j in TilemapEditorWindow.tile_dict.items()],
-                                                 "tile",
-                                                 self.tile_id,
-                                                 borderwidth=1,
-                                                 relief=tk.SUNKEN)}
-        self.set_pane("all")
+        self.load_groups()
+        self.set_pane("All")
+
+        # Add the category dropdown box
+        options = list([i for i, j in self.tile_panes.items()])
+        self.group_dropdown = tk.OptionMenu(self.frame, self.group, *options)
+        self.group_dropdown.grid(row=0, column=2, sticky=tk.E)
 
         # Build the editor window's toolbar
         self.menubar = tk.Menu(self.frame.master.master.master)
@@ -354,11 +357,42 @@ class TilemapEditorWindow:
         else:
             self.border_mode.set(0)
 
+    def _set_pane(self, name=None, index=None, op=None):
+        """Event callback to set the currently viewable pane"""
+        self.set_pane(self.group.get())
+
     def set_pane(self, pane):
         """Set the currently viewable pane"""
         for i, j in self.tile_panes.items():
             j.pack_forget()
+        self.group.set(pane)
         self.tile_panes[pane].pack(anchor="ne")
+
+    def load_groups(self):
+        """Loads all groups from the project file"""
+        # Add the "all" categories
+        self.tile_panes = {"All": TileCollection(self.selection_frame,
+                                                 [i for i, j in TilemapEditorWindow.tile_dict.items()],
+                                                 "tile",
+                                                 self.tile_id,
+                                                 borderwidth=1,
+                                                 relief=tk.SUNKEN)}
+
+        print("Discovered: ")
+        with open("project.json", mode="r") as f:
+            data = json.load(f)
+            for i in data["groups"]:
+                print(i["name"], "({})".format(i["type"]), "-", i["entries"])
+                if i["name"] not in self.tile_panes and i["type"] == "tile":
+                    self.tile_panes[i["name"]] = TileCollection(self.selection_frame,
+                                                                [TilemapEditorWindow.tile_dict[i] for i in i["entries"]],
+                                                                "tile",
+                                                                self.tile_id,
+                                                                borderwidth=1,
+                                                                relief=tk.SUNKEN)
+                else:
+                    print("WARNING: Duplicate group name '{}' detected in project file, group will not be loaded").\
+                        format(i["name"])
 
     @classmethod
     def _initialize_images(cls):
