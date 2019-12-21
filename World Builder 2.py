@@ -188,6 +188,7 @@ class TilemapEditorWindow:
 
         # Create a lookup dictionary of the available tile panes
         self.tile_panes = {}
+        self.deco_panes = {}
 
         # Add editor to parent window
         self.frame = ttk.Frame(parent)
@@ -215,6 +216,10 @@ class TilemapEditorWindow:
         self.group = tk.StringVar(self.frame, "", "selected_group")
         self.group.trace("w", self._set_pane)
 
+        # Add the selected layer tracking variable
+        self.layer = tk.IntVar(self.frame, 0, "selected_layer")
+        self.layer.trace("w", self._set_layer)
+
         # Add buttons panel
         self.buttons_bar = ttk.Frame(self.frame)
         self.buttons_bar.grid(row=0, column=1, sticky=tk.NW, pady=4)
@@ -234,6 +239,16 @@ class TilemapEditorWindow:
         self.grid_button = tk.Checkbutton(self.buttons_bar, variable=self.border_mode, indicator=0,
                                           image=TilemapEditorWindow.imgs["border"])
         self.grid_button.grid(row=0, column=4, sticky=tk.NW)
+
+        # Add spacing
+        self.button_spacing1 = tk.Frame(self.buttons_bar, height=16, width=16)
+        self.button_spacing1.grid(row=0, column=5, sticky=tk.NW)
+
+        # Add layer selection buttons (tile, deco, collision, loading, light)
+        for i, j in enumerate(["tile_layer", "deco_layer", "collider_layer", "loading_layer", "light_layer"]):
+            self.layer_button = tk.Radiobutton(self.buttons_bar, indicator=0, value=i, variable=self.layer,
+                                               image=TilemapEditorWindow.imgs[j])
+            self.layer_button.grid(row=0, column=i + 6, sticky=tk.NW)
 
         # Set up keybindings
         # TODO: Either move these keybindings somewhere else, or limit their scope
@@ -365,12 +380,23 @@ class TilemapEditorWindow:
         """Set the currently viewable pane"""
         for i, j in self.tile_panes.items():
             j.pack_forget()
+        for i, j in self.deco_panes.items():
+            j.pack_forget()
         self.group.set(pane)
         self.tile_panes[pane].pack(anchor="ne")
 
+    def _set_layer(self, name=None, index=None, op=None):
+        """Event callback for changing the currently editable layer"""
+        self.set_layer(self.layer.get())
+
+    def set_layer(self, layer):
+        """Set the currently editable layer"""
+        # TODO: Add functionality
+        pass
+
     def load_groups(self):
         """Loads all groups from the project file"""
-        # Add the "all" categories
+        # Add the hard-coded "all" category
         self.tile_panes = {"All": TileCollection(self.selection_frame,
                                                  [i for i, j in TilemapEditorWindow.tile_dict.items()],
                                                  "tile",
@@ -378,21 +404,37 @@ class TilemapEditorWindow:
                                                  borderwidth=1,
                                                  relief=tk.SUNKEN)}
 
-        print("Discovered: ")
+        print("Loaded: ")
         with open("project.json", mode="r") as f:
             data = json.load(f)
             for i in data["groups"]:
                 print(i["name"], "({})".format(i["type"]), "-", i["entries"])
+                # Load tile pane if applicable
                 if i["name"] not in self.tile_panes and i["type"] == "tile":
                     self.tile_panes[i["name"]] = TileCollection(self.selection_frame,
-                                                                [TilemapEditorWindow.tile_dict[i] for i in i["entries"]],
+                                                                [TilemapEditorWindow.tile_dict[i] for i in
+                                                                 i["entries"]],
                                                                 "tile",
                                                                 self.tile_id,
                                                                 borderwidth=1,
                                                                 relief=tk.SUNKEN)
+                # Load deco pane if applicable
+                elif i["name"] not in self.deco_panes and i["type"] == "deco":
+                    self.deco_panes[i["name"]] = TileCollection(self.selection_frame,
+                                                                [TilemapEditorWindow.deco_dict[i] for i in
+                                                                 i["entries"]],
+                                                                "deco",
+                                                                self.tile_id,
+                                                                borderwidth=1,
+                                                                relief=tk.SUNKEN)
+                # Handle invalid attempts to load pane
                 else:
-                    print("WARNING: Duplicate group name '{}' detected in project file, group will not be loaded").\
+                    print("WARNING: Invalid group name '{}' detected in project file, group will not be loaded"). \
                         format(i["name"])
+                    if i["type"] not in ["tile", "deco"]:
+                        print("Invalid type name?")
+                    else:
+                        print("Possible duplicate group?")
 
     @classmethod
     def _initialize_images(cls):
@@ -424,12 +466,45 @@ class TilemapEditorWindow:
             JVHLUpP0fM16Pov1is1qt5QCADs=
             '''
 
+        tile_layer_data = '''R0lGODlhIAAgAKECAAAAAD8/P////////yH5BAEKAAIALAAAAAA
+            gACAAAAJNlI+py+0Po5y0woCz\n3jy4DnZfAJTmiaJjyrJrC5dv3M50at9nrssN1sP9S
+            MHdsGhkAJE+JZHJ60V101uVdo1lYdvakQmw\niMfksvlsKQAAOw==
+            '''
+
+        deco_layer_data = '''R0lGODlhIAAgAIABAAAAAP///yH5BAEKAAEALAAAAAAgACAAAAJ
+            PjI8JkO1/FoMUyllzlLrf1WUf\nFjojWJpn2pwca7gXvH20st5xfssk6+v5fp4hqmQ8A
+            nk0mS4QbEZhRmpyWUUmlZXtTDNsCbnP77NG\n1JkrBQA7
+            '''
+
+        collision_layer_data = '''R0lGODlhIAAgAKECAAAAAGhoaP///////yH5BAEKAAMALA
+            AAAAAgACAAAAJrnI+py20AnGQQzvuq\nxVJv3ngRSIkjmZgnmqnsoX5svJLCLWi48O4+
+            3vv5WEIhqlKskEw3E4gmekI1nGn0YvVgstQJV9v5\nKh1i8KJ8TQXQlbV6zQYE3I+5HZ
+            69zyNyvV7l99cXSFh4xxfnUgAAOw==
+            '''
+
+        loading_layer_data = '''R0lGODlhIAAgAIABAAAAAP///yH5BAEKAAEALAAAAAAgACAA
+            AAJrBBKGmtfrmIwU2ocZ2rz7v2ng\nSBoTiXZnynJi64kv7JoXDa44Ou+ys6vpPqaisX
+            YjGpc5IG7YS9kaw9Y0VKFdldrXb1lUzcJU8HcU\nRaeDW/FzTZausVZnUGmu8vKTOdt+
+            x5WRtVJIeHgxUQAAOw==
+            '''
+
+        light_layer_data = '''R0lGODlhIAAgAKEAAAAAAM7Ozv///wAAACH5BAEKAAMALAAAAA
+            AgACAAAAJznI+py+0PBwCxnmkd\nvdv0LHWY94HlBabRiEzuyTIu97JzNgn6LpxWzuP5
+            VoBeMTh8AI/BHhEDbO4oL6JUmIpekxpmkysj\nScGKm3bKgZS8ujU5cX6rsaryMVb3BC
+            b7PBwQsCenJtjnxxGI51d1+Nf4CIlQAAA7
+            '''
+
         # Add embedded images to the image dictionary
         cls.imgs = {"add_new": tk.PhotoImage("img_addnew_active", data=addnew_data),
                     "draw": tk.PhotoImage("img_draw_tool", data=draw_tool_data),
                     "move": tk.PhotoImage("img_move_tool", data=move_tool_data),
                     "grid": tk.PhotoImage("img_grid_mode", data=grid_mode_data),
-                    "border": tk.PhotoImage("img_border_mode", data=border_mode_data)}
+                    "border": tk.PhotoImage("img_border_mode", data=border_mode_data),
+                    "tile_layer": tk.PhotoImage("img_tile_layer", data=tile_layer_data),
+                    "deco_layer": tk.PhotoImage("img_deco_layer", data=deco_layer_data),
+                    "collider_layer": tk.PhotoImage("img_collide_layer", data=collision_layer_data),
+                    "loading_layer": tk.PhotoImage("img_load_layer", data=loading_layer_data),
+                    "light_layer": tk.PhotoImage("img_light_layer", data=light_layer_data)}
 
         # Open the ids.json file to start loading the tiles/decos
         try:
