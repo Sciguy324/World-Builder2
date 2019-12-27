@@ -931,6 +931,7 @@ class TilemapView:
         with open(file, mode="w") as f:
             level_data = {"tilemap": self.tilemap,
                           "decomap": self.decomap,
+                          "colliders": self.collider,
                           "loading_zones": self.loading_zones,
                           "lightmap": self.lightmap,
                           "spawn": self.default_start,
