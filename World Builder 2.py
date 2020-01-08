@@ -380,7 +380,6 @@ class TilemapEditorWindow:
 
     def set_pane(self, pane, layer):
         """Set the currently viewable pane"""
-        # TODO: Add layer-specific panes
         for i, j in self.tile_panes.items():
             j.pack_forget()
         for i, j in self.deco_panes.items():
@@ -564,7 +563,7 @@ class TilemapEditorWindow:
 
 
 class TilemapView:
-    # TODO: Tkinterify TilemapView, and make it the responsibility of a subclass of CustomNotebook
+    # TODO: Tkinterify TilemapView
 
     __initialized = False
     imgs = {}
