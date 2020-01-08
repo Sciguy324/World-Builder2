@@ -270,7 +270,7 @@ class TilemapEditorWindow:
         self.selection_frame = ttk.Frame(self.frame)
         self.selection_frame.grid(row=1, column=2, sticky=tk.E, ipadx=20)
         self.load_groups()
-        self.set_pane("All")
+        self.set_pane("All", self.layer.get())
 
         # Add the category dropdown box
         options = list([i for i, j in self.tile_panes.items()])
@@ -349,7 +349,8 @@ class TilemapEditorWindow:
     def tile_id_callback(self, name=None, index=None, op=None):
         """Callback to set the grid visibility of the views"""
         for i in self.view_list:
-            i.frame.event_generate("<<TilemapEditorUpdateID>>", x=self.tile_id.get())
+            print(self.layer)
+            i.frame.event_generate("<<TilemapEditorUpdateID>>", x=self.tile_id.get(), y=self.layer.get())
 
     def keybind_draw_mode(self, event):
         """Callback for setting the editor to draw mode"""
@@ -375,9 +376,9 @@ class TilemapEditorWindow:
 
     def _set_pane(self, name=None, index=None, op=None):
         """Event callback to set the currently viewable pane"""
-        self.set_pane(self.group.get())
+        self.set_pane(self.group.get(), self.layer.get())
 
-    def set_pane(self, pane):
+    def set_pane(self, pane, layer):
         """Set the currently viewable pane"""
         # TODO: Add layer-specific panes
         for i, j in self.tile_panes.items():
@@ -385,7 +386,12 @@ class TilemapEditorWindow:
         for i, j in self.deco_panes.items():
             j.pack_forget()
         self.group.set(pane)
-        self.tile_panes[pane].pack(anchor="ne")
+        # Tilemap mode: select pane from the tile panes
+        if layer == 0:
+            self.tile_panes[pane].pack(anchor="ne")
+        # Decomap mode: select pane from the deco panes
+        elif layer == 1:
+            self.deco_panes[pane].pack(anchor="ne")
 
     def _set_layer(self, name=None, index=None, op=None):
         """Event callback for changing the currently editable layer"""
@@ -393,8 +399,23 @@ class TilemapEditorWindow:
 
     def set_layer(self, layer):
         """Set the currently editable layer"""
+        if layer == 0:
+            self.group_dropdown.forget()
+            options = list([i for i, j in self.tile_panes.items()])
+            self.group_dropdown = tk.OptionMenu(self.frame, self.group, *options)
+            self.group_dropdown.grid(row=0, column=2, sticky=tk.E)
+        elif layer == 1:
+            self.group_dropdown.forget()
+            options = list([i for i, j in self.deco_panes.items()])
+            self.group_dropdown = tk.OptionMenu(self.frame, self.group, *options)
+            self.group_dropdown.grid(row=0, column=2, sticky=tk.E)
+        else:
+            self.group_dropdown.grid_forget()
+            self.group_dropdown.forget()
+
+        self.set_pane("All", layer)
         for i in self.view_list:
-            i.frame.event_generate("<<TilemapEditorCollisionToggle>>", x=layer)
+            i.frame.event_generate("<<TilemapEditorLayerChange>>", x=layer)
 
     def load_groups(self):
         """Loads all groups from the project file"""
@@ -402,6 +423,13 @@ class TilemapEditorWindow:
         self.tile_panes = {"All": TileCollection(self.selection_frame,
                                                  [i for i, j in TilemapEditorWindow.tile_dict.items()],
                                                  "tile",
+                                                 self.tile_id,
+                                                 borderwidth=1,
+                                                 relief=tk.SUNKEN)}
+
+        self.deco_panes = {"All": TileCollection(self.selection_frame,
+                                                 [i for i, j in TilemapEditorWindow.deco_dict.items()],
+                                                 "deco",
                                                  self.tile_id,
                                                  borderwidth=1,
                                                  relief=tk.SUNKEN)}
@@ -559,7 +587,7 @@ class TilemapView:
         self.grid = grid_scheme
         self.border = border_scheme
         self.layer = layer
-        self.current_tile = 0
+        self.current_tile = [0, 0, 0, 0, 0]
 
         # Declare some variables related to the tilemap itself
         self.name = "Untitled"
@@ -597,7 +625,7 @@ class TilemapView:
         self.frame.bind("<<TilemapEditorBorderToggle>>", self._set_border)
         self.frame.bind("<<TilemapEditorForceRedraw>>", self.redraw_view)
         self.frame.bind("<<TilemapEditorUpdateID>>", self.set_id)
-        self.frame.bind("<<TilemapEditorCollisionToggle>>", self._set_layer)
+        self.frame.bind("<<TilemapEditorLayerChange>>", self._set_layer)
 
         # Add the view to the parent frame
         parent.add(self.frame)
@@ -710,7 +738,7 @@ class TilemapView:
 
     def set_id(self, event):
         """Event callback to update the current tile ID"""
-        self.current_tile = event.x
+        self.current_tile[event.y] = event.x
 
     def update_title(self):
         """Update the title of the view"""
@@ -738,7 +766,8 @@ class TilemapView:
                 self.canvas.bind("<ButtonRelease-1>", self._draw_tile_and_grid)
             # Decomap mode
             elif self.layer == 1:
-                pass
+                self.canvas.bind("<B1-Motion>", self.draw_deco)
+                self.canvas.bind("<ButtonRelease-1>", self._draw_deco_and_grid)
             # Collision map mode
             elif self.layer == 2:
                 self.canvas.bind("<B1-Motion>", self.draw_collider)
@@ -763,6 +792,11 @@ class TilemapView:
     def _draw_tile_and_grid(self, event):
         self.canvas.delete("all")
         self.draw_tile(event)
+        self.redraw_view()
+
+    def _draw_deco_and_grid(self, event):
+        self.canvas.delete("all")
+        self.draw_deco(event)
         self.redraw_view()
 
     def _draw_collider_and_grid(self, event):
@@ -809,7 +843,6 @@ class TilemapView:
         """Event callback for drawing a tile on the grid"""
         # Determine the position at which to to draw the tile
         tile_x = int(self.canvas.xview()[0] * len(self.tilemap[0]) + event.x / 64)
-
         tile_y = int(self.canvas.yview()[0] * len(self.tilemap) + event.y / 64)
 
         if not self.border:
@@ -828,10 +861,39 @@ class TilemapView:
 
         # Draw the tile
         self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
-                                 image=TilemapEditorWindow.tile_dict[self.current_tile])
+                                 image=TilemapEditorWindow.tile_dict[self.current_tile[0]])
         # Add the tile to the tilemap matrix
         try:
-            self.tilemap[tile_y][tile_x] = int(self.current_tile)
+            self.tilemap[tile_y][tile_x] = int(self.current_tile[0])
+        except IndexError:
+            pass
+
+    def draw_deco(self, event):
+        """Draw either a tile or a deco on the grid, depending on the arguments"""
+        # Determine the position at which to to draw the tile
+        tile_x = int(self.canvas.xview()[0] * len(self.decomap[0]) + event.x / 64)
+        tile_y = int(self.canvas.yview()[0] * len(self.decomap) + event.y / 64)
+
+        if not self.border:
+            tile_x += 1
+            tile_y += 1
+
+        # Check to make sure tile is actually on the screen.  If not, cancel drawing.
+        if event.y / 64 < int(self.canvas.yview()[0] * len(self.decomap)):
+            return
+        if event.y / 64 + 0.1 > int(self.canvas.yview()[1] * len(self.decomap) - 1 - int(not self.border)):
+            return
+        if event.x / 64 < int(self.canvas.xview()[0] * len(self.decomap[0])):
+            return
+        if event.x / 64 + 0.1 > int(self.canvas.xview()[1] * len(self.decomap[0]) - 1 - int(not self.border)):
+            return
+
+        # Draw the tile
+        self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
+                                 image=TilemapEditorWindow.deco_dict[self.current_tile[1]])
+        # Add the tile to the tilemap matrix
+        try:
+            self.decomap[tile_y][tile_x] = int(self.current_tile[1])
         except IndexError:
             pass
 
