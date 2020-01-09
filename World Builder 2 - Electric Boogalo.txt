@@ -10,28 +10,28 @@ Core Features:
 Core Feature Elaboration:
 
 	-Tilemap editing window:
-		-Similar to the original worldbuilder, with additional features
-		-Can have multiple tilemaps open at once
-		-Tile selection pane (right)
+		-Similar to the original world-builder, with additional features
+		--Can have multiple tilemaps open at once
+		--Tile selection pane (right)
 		-Buttons and key shortcuts for:
 			-Draw
 			--Move
 			--Show/hide grid
 			--Toggle border visibility
-			-Tilemap layer
-			-Decoration layer
-			-Collision map
+			--Tilemap layer
+			--Decoration layer
+			--Collision map
 			-Loading zone layer
 			-Lighting layer
 			-Switching between panels for individual tiles and tile assemblies
-			-Dropdown box for selecting tile group
+			--Dropdown box for selecting tile group
 		
 		-Tile collections:
 			-These are configurable groupings of tiles to make it easier to find specific tiles
 			-Better optimized loading:
-				-Build panels on startup and on configuring, rather than on every switch
-				-New "TileGroup" class for panels
-			-Hard-coded group of "All" tiles
+				--Build panels on startup and on configuring, rather than on every switch
+				--New "TileGroup" class for panels
+			--Hard-coded group of "All" tiles
 		
 		-Tile assemblies:
 			-These are multi-tile objects that allow one to place structures quickly—like trees, for example
@@ -46,17 +46,17 @@ Core Feature Elaboration:
 		-Collision geometry editor:
 			-Allows you to edit the collision geometry of a tile or tile assembly and apply to the map
 				-Prompt that asks if you want to apply changes to specially modified tiles
-			-Toggleable collision map overlay.
+			--Toggleable collision map overlay.
 
-		-Border:
+		--Border:
 			-The border is a region, marked by warning tape, that the player cannot see
 			-This allows for placing loading zones just outside the map, rather than awkwardly just before
-			-The tiles here can be configured between solid and non-solid
+			X-The tiles here can be configured between solid and non-solid
 			-The border's visibility in the editor can be toggled using a button
 
 		-Quality of life tools:
 			-Undo/redo buttons and keyboard shortcuts
-			-Separate row/collumn and x/y coordinate indicator
+			--Separate row/column and x/y coordinate indicator
 			-"Draw-line" tool triggered by holding "shift"
 				-Releasing "shift" cancels, and blocks further drawing until mouse button is released
 				-Line indicator visible while in use

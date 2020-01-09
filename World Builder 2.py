@@ -252,6 +252,22 @@ class TilemapEditorWindow(tk.Frame):
                                                image=TilemapEditorWindow.imgs[j])
             self.layer_button.grid(row=0, column=i + 6, sticky=tk.NW)
 
+        # Add another spacing
+        self.button_spacing2 = tk.Frame(self.buttons_bar, height=16, width=16)
+        self.button_spacing2.grid(row=0, column=11, sticky=tk.NW)
+
+        # Add the tile coordinate label
+        self.tile_coords_text = tk.StringVar(self, "Row, Col: ¯\\_(ツ)_/¯", "tile_coords_text")
+        self.tile_coords = tk.Label(self.buttons_bar, textvariable=self.tile_coords_text,
+                                    borderwidth=1, relief=tk.SUNKEN, padx=5, pady=5)
+        self.tile_coords.grid(row=0, column=12, sticky=tk.W, )
+
+        # Add the level coordinate label
+        self.level_coords_text = tk.StringVar(self, "X, Y: ¯\\_(ツ)_/¯", "level_coords_text")
+        self.level_coords = tk.Label(self.buttons_bar, textvariable=self.level_coords_text,
+                                     borderwidth=1, relief=tk.SUNKEN, padx=5, pady=5)
+        self.level_coords.grid(row=0, column=13, sticky=tk.W)
+
         # Set up keybindings
         parent.master.bind("<Key-1>", self.keybind_draw_mode)
         parent.master.bind("<Key-2>", self.keybind_move_mode)
@@ -291,7 +307,41 @@ class TilemapEditorWindow(tk.Frame):
         self.filemenu.add_command(label="Save Map (Ctrl-S)", command=self._save_map)
         self.filemenu.add_command(label="Save Map As (Ctrl-Shift-S)", command=self._save_map_as)
         self.filemenu.add_command(label="New Map (Ctrl-N)", command=self.new_view)
+        self.filemenu.add_separator()
+        self.filemenu.add_command(label="Settings", command=self.unimplemented)
         self.menubar.add_cascade(label="File", menu=self.filemenu)
+
+        # Create the edit menubar
+        self.editmenu = tk.Menu(self.menubar, tearoff=0)
+        self.editmenu.add_command(label="Undo (Ctrl-Z)", command=self.unimplemented)
+        self.editmenu.add_command(label="Redo (Ctrl-Y)", command=self.unimplemented)
+        self.editmenu.add_separator()
+        self.editmenu.add_command(label="Change Tilemap Size", command=self.unimplemented)
+        self.editmenu.add_separator()
+        self.editmenu.add_command(label="Set Default Spawn", command=self.unimplemented)
+        self.menubar.add_cascade(label="Edit", menu=self.editmenu, command=self.unimplemented)
+
+        # Create the tile menubar
+        self.tilemenu = tk.Menu(self.menubar, tearoff=0)
+        self.tilemenu.add_command(label="Edit Tile Geometry", command=self.unimplemented)
+        self.tilemenu.add_command(label="Apply Tile Geometry", command=self.unimplemented)
+        self.tilemenu.add_separator()
+        self.tilemenu.add_command(label="Edit Tile Groups", command=self.unimplemented)
+        self.tilemenu.add_command(label="Edit Deco Groups", command=self.unimplemented)
+        self.menubar.add_cascade(label="Tile", menu=self.tilemenu)
+
+        # Create the assembly menubar
+        self.assemblymenu = tk.Menu(self.menubar, tearoff=0)
+        self.assemblymenu.add_command(label="Edit Tile Geometries", command=self.unimplemented)
+        self.assemblymenu.add_command(label="Apply Tile Geometries", command=self.unimplemented)
+        self.assemblymenu.add_separator()
+        self.assemblymenu.add_command(label="Edit Assembly Groups", command=self.unimplemented)
+        self.menubar.add_cascade(label="Assembly", menu=self.assemblymenu)
+
+        # Create the help menubar
+        self.helpmenu = tk.Menu(self.menubar, tearoff=0)
+        self.helpmenu.add_command(label="Ok", command=self.unimplemented)
+        self.menubar.add_cascade(label="Help", menu=self.helpmenu)
 
         # Create initial tilemap view
         self.new_view()
@@ -331,6 +381,10 @@ class TilemapEditorWindow(tk.Frame):
         if self.view_list[event.x].close():
             self.tilemap_panel.forget(event.x)
             del self.view_list[event.x]
+
+    def unimplemented(self, event=None):
+        """This function has not yet been implemented"""
+        print("This feature has not yet been implemented")
 
     def tool_callback(self, name=None, index=None, op=None):
         """Set the mode of views to draw mode"""
@@ -643,9 +697,15 @@ class TilemapView(tk.Frame):
         # Ensure settings are set
         self.set_mode(parent.master.tool_mode.get())
         self.set_border(parent.master.border_mode.get())
+        self.canvas.bind("<Motion>", self.update_coords)
 
         # Draw the entire view
         self.redraw_view()
+
+    def update_coords(self, event):
+        """Event callback for updating the tilemap editor's coordinates"""
+        self.master.master.tile_coords_text.set("Row, Col: {}, {}".format(event.y // 64, event.x // 64))
+        self.master.master.level_coords_text.set("X, Y: {}, {}".format(event.x, event.y))
 
     def close(self):
         """Tells the view to close"""
@@ -654,6 +714,7 @@ class TilemapView(tk.Frame):
             action = messagebox.askyesnocancel("World Builder 2",
                                                "Progress is unsaved.  Would you like to save first?",
                                                icon='warning')
+
             # User wants to save progress before closing tab
             if action:
                 self.save_to_file(self.file_path)
@@ -1212,7 +1273,10 @@ class App:
         self.menubar = tk.Menu(self.source.master)
         # Tilemap editor window toolbar
         if value == 0:
+            # self.menubar = self.tilemap_editor.menubar
             self.source.master.config(menu=self.tilemap_editor.menubar)
+        else:
+            self.source.master.config(menu=self.menubar)
 
 
 if __name__ == "__main__":
