@@ -253,11 +253,14 @@ class TilemapEditorWindow(tk.Frame):
             self.layer_button.grid(row=0, column=i + 6, sticky=tk.NW)
 
         # Set up keybindings
-        # TODO: Either move these keybindings somewhere else, or limit their scope
         parent.master.bind("<Key-1>", self.keybind_draw_mode)
         parent.master.bind("<Key-2>", self.keybind_move_mode)
         parent.master.bind("<Key-3>", self.keybind_grid_mode)
         parent.master.bind("<Key-4>", self.keybind_border_mode)
+
+        # Set up the layer keybindings
+        for i in range(5, 10):
+            parent.master.bind("<Key-{}>".format(i), self.keybind_layer_mode)
 
         # Set up level viewing section
         self.tilemap_panel = CustomNotebook(self)
@@ -356,14 +359,20 @@ class TilemapEditorWindow(tk.Frame):
 
     def keybind_draw_mode(self, event):
         """Callback for setting the editor to draw mode"""
+        if self.master.index("current") != 0:
+            return
         self.tool_mode.set(0)
 
     def keybind_move_mode(self, event):
         """Callback for setting the editor to move mode"""
+        if self.master.index("current") != 0:
+            return
         self.tool_mode.set(1)
 
     def keybind_grid_mode(self, event):
         """Callback for setting the editor to draw mode"""
+        if self.master.index("current") != 0:
+            return
         if self.grid_mode.get() == 0:
             self.grid_mode.set(1)
         else:
@@ -371,10 +380,16 @@ class TilemapEditorWindow(tk.Frame):
 
     def keybind_border_mode(self, event):
         """Callback for setting the editor to draw mode"""
+        if self.master.index("current") != 0:
+            return
         if self.border_mode.get() == 0:
             self.border_mode.set(1)
         else:
             self.border_mode.set(0)
+
+    def keybind_layer_mode(self, event):
+        """Callback for setting the layer"""
+        self.layer.set(int(event.char) - 5)
 
     def _set_pane(self, name=None, index=None, op=None):
         """Event callback to set the currently viewable pane"""
