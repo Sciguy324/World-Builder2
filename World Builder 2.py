@@ -741,14 +741,26 @@ class TilemapView(tk.Frame):
         for i in range(self.level_height * 2 + 1):
             self.canvas.create_line(0, 32 * i, 64 * self.level_width, 32 * i, fill="BLACK", width=1.0)
         for i, j in enumerate(self.collider):
+            solid_count = 0
+            last_k = 0
+            # When drawing rows, combine adjacent solids into a single rectangle
             for k, m in enumerate(j):
                 if m == 1:
-                    # self.canvas.create_image((k * 32 + 16, i * 32 + 16), image=TilemapEditorWindow.solid)
-                    self.canvas.create_rectangle((k * 32, i * 32, k * 32 + 32, i * 32 + 32),
-                                                 outline="black",
+                    solid_count += 1
+                elif m == 0 and solid_count > 0:
+                    self.canvas.create_rectangle((k * 32 - 32 * solid_count, i * 32, k * 32, i * 32 + 32),
                                                  fill="gray",
                                                  width=1,
                                                  stipple="gray50")
+                    solid_count = 0
+                last_k = k
+
+            # Entire row was solid, and never got a chance to fill in during loop.  Do so now.
+            if solid_count > 0:
+                self.canvas.create_rectangle((0, i * 32, last_k * 32 + 32, i * 32 + 32),
+                                             fill="gray",
+                                             width=1,
+                                             stipple="gray50")
 
     def draw_grid(self):
         """Draw the tilemap grid"""
@@ -953,7 +965,9 @@ class TilemapView(tk.Frame):
 
     def draw_collider(self, event):
         """Event callback for drawing a tile on the grid"""
-        if not self.master.master.border_mode.get():
+        border = self.master.master.border_mode.get()
+
+        if not border:
             event.x += 32
             event.y += 32
 
@@ -961,7 +975,7 @@ class TilemapView(tk.Frame):
         tile_x = int(self.canvas.xview()[0] * len(self.collider[0]) + event.x / 32)
         tile_y = int(self.canvas.yview()[0] * len(self.collider) + event.y / 32)
 
-        if not self.master.master.border_mode.get():
+        if not border:
             tile_x += 1
             tile_y += 1
 
@@ -970,21 +984,21 @@ class TilemapView(tk.Frame):
         if event.y / 32 < int(self.canvas.yview()[0] * len(self.collider)):
             return
         # Bottom side catch
-        if event.y / 32 + 0.2 > int(self.canvas.yview()[1] * len(self.collider) - 1 - 2 * int(not self.master.master.border_mode.get())):
+        if event.y / 32 + 0.2 > int(self.canvas.yview()[1] * len(self.collider) - 1 - 2 * int(not border)):
             return
         # Left size catch
         if event.x / 32 < int(self.canvas.xview()[0] * len(self.collider[0])):
             return
         # Right side catch
-        if event.x / 32 + 0.2 > int(self.canvas.xview()[1] * len(self.collider[0]) - 1 - 2 * int(not self.master.master.border_mode.get())):
+        if event.x / 32 + 0.2 > int(self.canvas.xview()[1] * len(self.collider[0]) - 1 - 2 * int(not border)):
             return
 
         # Draw the tile
         self.canvas.create_rectangle((tile_x * 32, tile_y * 32, tile_x * 32 + 32, tile_y * 32 + 32),
-                                     outline="black",
                                      fill="gray",
                                      width=1,
                                      stipple="gray50")
+
         # Add the tile to the tilemap matrix
         try:
             self.collider[tile_y][tile_x] = 1
