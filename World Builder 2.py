@@ -22,15 +22,15 @@ class CustomButton(ttk.Button):
 
         # self._active = None
 
-        self.bind("<ButtonPress-1>", self.on_press, True)
-        self.bind("<ButtonRelease-1>", self.on_release, True)
+        self.bind("<ButtonPress-1>", lambda event: self.on_press(), True)
+        self.bind("<ButtonRelease-1>", lambda event: self.on_release(), True)
 
-    def on_press(self, event):
+    def on_press(self):
         """Called when the button is pressed over the new map button"""
         self.state(['pressed'])
         print(self.config())
 
-    def on_release(self, event):
+    def on_release(self):
         """Called when the button is released over the new map button"""
         if not self.instate(['pressed']):
             return
@@ -232,7 +232,7 @@ class TilemapEditorWindow(tk.Frame):
 
         # Add the selected layer tracking variable
         self.layer = tk.IntVar(self, 0, "selected_layer")
-        self.layer.trace("w", self._set_layer)
+        self.layer.trace("w", lambda name, index, op: self.set_layer(self.layer.get()))
 
         # Add buttons panel
         self.buttons_bar = ttk.Frame(self)
@@ -424,19 +424,19 @@ class TilemapEditorWindow(tk.Frame):
         for i in self.view_list:
             i.set_id(self.deco_id.get())
 
-    def keybind_draw_mode(self, event):
+    def keybind_draw_mode(self, event=None):
         """Callback for setting the editor to draw mode"""
         if self.master.index("current") != 0:
             return
         self.tool_mode.set(0)
 
-    def keybind_move_mode(self, event):
+    def keybind_move_mode(self, event=None):
         """Callback for setting the editor to move mode"""
         if self.master.index("current") != 0:
             return
         self.tool_mode.set(1)
 
-    def keybind_grid_mode(self, event):
+    def keybind_grid_mode(self, event=None):
         """Callback for setting the editor to draw mode"""
         if self.master.index("current") != 0:
             return
@@ -445,7 +445,7 @@ class TilemapEditorWindow(tk.Frame):
         else:
             self.grid_mode.set(0)
 
-    def keybind_border_mode(self, event):
+    def keybind_border_mode(self, event=None):
         """Callback for setting the editor to draw mode"""
         if self.master.index("current") != 0:
             return
@@ -477,10 +477,6 @@ class TilemapEditorWindow(tk.Frame):
         # Lightmap mode: select the lightmap pane
         elif layer == 4:
             self.panes["light"][pane].pack(anchor="ne")
-
-    def _set_layer(self, name=None, index=None, op=None):
-        """Event callback for changing the currently editable layer"""
-        self.set_layer(self.layer.get())
 
     def set_layer(self, layer):
         """Set the currently editable layer"""
@@ -733,16 +729,8 @@ class TilemapView(tk.Frame):
         self.saved = False
         self.current_tile = 0
 
-        # Declare some variables related to the tilemap itself
-        self.name = "Untitled"
-        self.level_width = 16 + 2
-        self.level_height = 9 + 2
-        self.tilemap = [[0] * self.level_width for i in range(self.level_height)]
-        self.decomap = [[0] * self.level_width for i in range(self.level_height)]
-        self.collider = [[0] * (self.level_width * 2) for i in range(self.level_height * 2)]
-        self.default_start = [0, 0]
-        self.lightmap = []
-        self.loading_zones = []
+        # Declare the tilemap data
+        self.level = Level()
         self.file_path = None
 
         # Create element layout
@@ -757,7 +745,7 @@ class TilemapView(tk.Frame):
         self.canvas_hbar = tk.Scrollbar(self.frame, orient=tk.HORIZONTAL, command=self.canvas.xview)
         self.canvas_hbar.grid(row=1, column=0, sticky=tk.EW)
         self.canvas_hbar.activate("slider")
-        self.canvas.config(scrollregion=(0, 0, 64 * self.level_width, 64 * self.level_height),
+        self.canvas.config(scrollregion=(0, 0, 64 * self.level.level_width, 64 * self.level.level_height),
                            xscrollcommand=self.canvas_hbar.set,
                            yscrollcommand=self.canvas_vbar.set)
         self.canvas.xview(tk.MOVETO, 0.0)
@@ -809,11 +797,11 @@ class TilemapView(tk.Frame):
 
     def draw_collision(self):
         """Draw the collision map"""
-        for i in range(self.level_width * 2 + 1):
-            self.canvas.create_line(32 * i, 0, 32 * i, 64 * self.level_height, fill="BLACK", width=1.0)
-        for i in range(self.level_height * 2 + 1):
-            self.canvas.create_line(0, 32 * i, 64 * self.level_width, 32 * i, fill="BLACK", width=1.0)
-        for i, j in enumerate(self.collider):
+        for i in range(self.level.level_width * 2 + 1):
+            self.canvas.create_line(32 * i, 0, 32 * i, 64 * self.level.level_height, fill="BLACK", width=1.0)
+        for i in range(self.level.level_height * 2 + 1):
+            self.canvas.create_line(0, 32 * i, 64 * self.level.level_width, 32 * i, fill="BLACK", width=1.0)
+        for i, j in enumerate(self.level.collider):
             solid_count = 0
             last_k = 0
             # When drawing rows, combine adjacent solids into a single rectangle
@@ -837,33 +825,33 @@ class TilemapView(tk.Frame):
 
     def draw_grid(self):
         """Draw the tilemap grid"""
-        for i in range(self.level_width + 1):
-            self.canvas.create_line(64 * i, 0, 64 * i, 64 * self.level_height, fill="BLACK", width=2.0)
-        for i in range(self.level_height + 1):
-            self.canvas.create_line(0, 64 * i, 64 * self.level_width, 64 * i, fill="BLACK", width=2.0)
+        for i in range(self.level.level_width + 1):
+            self.canvas.create_line(64 * i, 0, 64 * i, 64 * self.level.level_height, fill="BLACK", width=2.0)
+        for i in range(self.level.level_height + 1):
+            self.canvas.create_line(0, 64 * i, 64 * self.level.level_width, 64 * i, fill="BLACK", width=2.0)
 
     def draw_tilemap(self):
         """Draw the current level"""
-        for i, j in enumerate(self.tilemap):
+        for i, j in enumerate(self.level.tilemap):
             for k, m in enumerate(j):
                 if m != 0:
                     self.canvas.create_image((k * 64 + 32, i * 64 + 32), image=TilemapEditorWindow.tile_dict[m])
 
     def draw_decomap(self):
         """Draw the current level"""
-        for i, j in enumerate(self.decomap):
+        for i, j in enumerate(self.level.decomap):
             for k, m in enumerate(j):
                 if m != 0:
                     self.canvas.create_image((k * 64 + 32, i * 64 + 32), image=TilemapEditorWindow.deco_dict[m])
 
     def draw_border(self):
         """Draw the border"""
-        for i in range(self.level_width):
+        for i in range(self.level.level_width):
             self.canvas.create_image((i * 64 + 32, 32), image=TilemapView.imgs["border"])
-            self.canvas.create_image((i * 64 + 32, self.level_height * 64 - 32), image=TilemapView.imgs["border"])
-        for i in range(1, self.level_height - 1):
+            self.canvas.create_image((i * 64 + 32, self.level.level_height * 64 - 32), image=TilemapView.imgs["border"])
+        for i in range(1, self.level.level_height - 1):
             self.canvas.create_image((32, i * 64 + 32), image=TilemapView.imgs["border"])
-            self.canvas.create_image((self.level_width * 64 - 32, i * 64 + 32), image=TilemapView.imgs["border"])
+            self.canvas.create_image((self.level.level_width * 64 - 32, i * 64 + 32), image=TilemapView.imgs["border"])
 
     def redraw_view(self):
         """Redraw the entire view"""
@@ -898,9 +886,9 @@ class TilemapView(tk.Frame):
         """Update the title of the view"""
         # If not saved, add an asterisk in front of the displayed name
         if self.saved:
-            self.frame.master.tab(self.frame, text=self.name)
+            self.frame.master.tab(self.frame, text=self.level.name)
         else:
-            self.frame.master.tab(self.frame, text="*" + self.name)
+            self.frame.master.tab(self.frame, text="*" + self.level.name)
 
     def set_mode(self, value):
         """Does the actual work of setting the window's mode"""
@@ -962,11 +950,13 @@ class TilemapView(tk.Frame):
         if value:
             # Show border
             self.canvas.delete("all")
-            self.canvas.config(scrollregion=(0, 0, 64 * self.level_width, 64 * self.level_height))
+            self.canvas.config(scrollregion=(0, 0, 64 * self.level.level_width,
+                                             64 * self.level.level_height))
         else:
             # Disable border
             self.canvas.delete("all")
-            self.canvas.config(scrollregion=(64, 64, 64 * (self.level_width - 1), 64 * (self.level_height - 1)))
+            self.canvas.config(scrollregion=(64, 64, 64 * (self.level.level_width - 1),
+                                             64 * (self.level.level_height - 1)))
         self.redraw_view()
 
     def set_layer(self):
@@ -977,8 +967,8 @@ class TilemapView(tk.Frame):
     def draw_tile(self, event):
         """Event callback for drawing a tile on the grid"""
         # Determine the position at which to to draw the tile
-        tile_x = int(self.canvas.xview()[0] * len(self.tilemap[0]) + event.x / 64)
-        tile_y = int(self.canvas.yview()[0] * len(self.tilemap) + event.y / 64)
+        tile_x = int(self.canvas.xview()[0] * len(self.level.tilemap[0]) + event.x / 64)
+        tile_y = int(self.canvas.yview()[0] * len(self.level.tilemap) + event.y / 64)
 
         border_mode = self.master.master.border_mode.get()
 
@@ -987,13 +977,13 @@ class TilemapView(tk.Frame):
             tile_y += 1
 
         # Check to make sure tile is actually on the screen.  If not, cancel drawing.
-        if event.y / 64 < int(self.canvas.yview()[0] * len(self.tilemap)):
+        if event.y / 64 < int(self.canvas.yview()[0] * len(self.level.tilemap)):
             return
-        if event.y / 64 + 0.1 > int(self.canvas.yview()[1] * len(self.tilemap) - 1 - int(not border_mode)):
+        if event.y / 64 + 0.1 > int(self.canvas.yview()[1] * len(self.level.tilemap) - 1 - int(not border_mode)):
             return
-        if event.x / 64 < int(self.canvas.xview()[0] * len(self.tilemap[0])):
+        if event.x / 64 < int(self.canvas.xview()[0] * len(self.level.tilemap[0])):
             return
-        if event.x / 64 + 0.1 > int(self.canvas.xview()[1] * len(self.tilemap[0]) - 1 - int(not border_mode)):
+        if event.x / 64 + 0.1 > int(self.canvas.xview()[1] * len(self.level.tilemap[0]) - 1 - int(not border_mode)):
             return
 
         # Draw the tile
@@ -1001,15 +991,15 @@ class TilemapView(tk.Frame):
                                  image=TilemapEditorWindow.tile_dict[self.current_tile])
         # Add the tile to the tilemap matrix
         try:
-            self.tilemap[tile_y][tile_x] = int(self.current_tile)
+            self.level.tilemap[tile_y][tile_x] = int(self.current_tile)
         except IndexError:
             pass
 
     def draw_deco(self, event):
         """Draw either a tile or a deco on the grid, depending on the arguments"""
         # Determine the position at which to to draw the tile
-        tile_x = int(self.canvas.xview()[0] * len(self.decomap[0]) + event.x / 64)
-        tile_y = int(self.canvas.yview()[0] * len(self.decomap) + event.y / 64)
+        tile_x = int(self.canvas.xview()[0] * len(self.level.decomap[0]) + event.x / 64)
+        tile_y = int(self.canvas.yview()[0] * len(self.level.decomap) + event.y / 64)
 
         border_mode = self.master.master.border_mode.get()
 
@@ -1018,13 +1008,13 @@ class TilemapView(tk.Frame):
             tile_y += 1
 
         # Check to make sure tile is actually on the screen.  If not, cancel drawing.
-        if event.y / 64 < int(self.canvas.yview()[0] * len(self.decomap)):
+        if event.y / 64 < int(self.canvas.yview()[0] * len(self.level.decomap)):
             return
-        if event.y / 64 + 0.1 > int(self.canvas.yview()[1] * len(self.decomap) - 1 - int(not border_mode)):
+        if event.y / 64 + 0.1 > int(self.canvas.yview()[1] * len(self.level.decomap) - 1 - int(not border_mode)):
             return
-        if event.x / 64 < int(self.canvas.xview()[0] * len(self.decomap[0])):
+        if event.x / 64 < int(self.canvas.xview()[0] * len(self.level.decomap[0])):
             return
-        if event.x / 64 + 0.1 > int(self.canvas.xview()[1] * len(self.decomap[0]) - 1 - int(not border_mode)):
+        if event.x / 64 + 0.1 > int(self.canvas.xview()[1] * len(self.level.decomap[0]) - 1 - int(not border_mode)):
             return
 
         # Draw the tile
@@ -1032,7 +1022,7 @@ class TilemapView(tk.Frame):
                                  image=TilemapEditorWindow.deco_dict[self.current_tile])
         # Add the tile to the tilemap matrix
         try:
-            self.decomap[tile_y][tile_x] = int(self.current_tile)
+            self.level.decomap[tile_y][tile_x] = int(self.current_tile)
         except IndexError:
             pass
 
@@ -1045,8 +1035,8 @@ class TilemapView(tk.Frame):
             event.y += 32
 
         # Determine the position at which to to draw the tile
-        tile_x = int(self.canvas.xview()[0] * len(self.collider[0]) + event.x / 32)
-        tile_y = int(self.canvas.yview()[0] * len(self.collider) + event.y / 32)
+        tile_x = int(self.canvas.xview()[0] * len(self.level.collider[0]) + event.x / 32)
+        tile_y = int(self.canvas.yview()[0] * len(self.level.collider) + event.y / 32)
 
         if not border:
             tile_x += 1
@@ -1054,16 +1044,16 @@ class TilemapView(tk.Frame):
 
         # Check to make sure tile is actually on the screen.  If not, cancel drawing.
         # Top side catch
-        if event.y / 32 < int(self.canvas.yview()[0] * len(self.collider)):
+        if event.y / 32 < int(self.canvas.yview()[0] * len(self.level.collider)):
             return
         # Bottom side catch
-        if event.y / 32 + 0.2 > int(self.canvas.yview()[1] * len(self.collider) - 1 - 2 * int(not border)):
+        if event.y / 32 + 0.2 > int(self.canvas.yview()[1] * len(self.level.collider) - 1 - 2 * int(not border)):
             return
         # Left size catch
-        if event.x / 32 < int(self.canvas.xview()[0] * len(self.collider[0])):
+        if event.x / 32 < int(self.canvas.xview()[0] * len(self.level.collider[0])):
             return
         # Right side catch
-        if event.x / 32 + 0.2 > int(self.canvas.xview()[1] * len(self.collider[0]) - 1 - 2 * int(not border)):
+        if event.x / 32 + 0.2 > int(self.canvas.xview()[1] * len(self.level.collider[0]) - 1 - 2 * int(not border)):
             return
 
         # Draw the tile
@@ -1074,7 +1064,7 @@ class TilemapView(tk.Frame):
 
         # Add the tile to the tilemap matrix
         try:
-            self.collider[tile_y][tile_x] = 1
+            self.level.collider[tile_y][tile_x] = 1
         except IndexError:
             pass
 
@@ -1095,14 +1085,7 @@ class TilemapView(tk.Frame):
         """Loads level data from a .json file"""
         with open(file, mode="r") as f:
             level_data = json.load(f)
-            self.tilemap = level_data["tilemap"]
-            self.decomap = level_data["decomap"]
-            self.level_height = len(self.tilemap)
-            self.level_width = len(self.tilemap[0])
-            self.name = level_data["name"]
-            self.default_start = level_data["spawn"]
-            self.lightmap = level_data["lightmap"]
-            self.loading_zones = level_data["loading_zones"]
+            self.level.load_from_json(level_data)
             self.saved = True
         self.set_border(self.master.master.border_mode.get())
         self.update_title()
@@ -1126,20 +1109,13 @@ class TilemapView(tk.Frame):
 
             # Record path
             file = path.split(file)[1]
-            self.name = path.splitext(file)[0]
+            self.level.name = path.splitext(file)[0]
             file = path.join("maps", file)
             self.file_path = file
 
         # Write json tag to file
         with open(file, mode="w") as f:
-            level_data = {"tilemap": self.tilemap,
-                          "decomap": self.decomap,
-                          "colliders": self.collider,
-                          "loading_zones": self.loading_zones,
-                          "lightmap": self.lightmap,
-                          "spawn": self.default_start,
-                          "name": self.name}
-            json.dump(level_data, f)
+            f.write(self.level.jsonify())
         self.saved = True
         self.update_title()
 
@@ -1164,6 +1140,43 @@ class TilemapView(tk.Frame):
         cls.imgs = {"border": border_tile_data,
                     "active_zone": active_zone,
                     "inactive_zone": inactive_zone}
+
+
+class Level:
+    """Container structure for level data"""
+
+    def __init__(self):
+        self.name = "Untitled"
+        self.level_width = 16 + 2
+        self.level_height = 9 + 2
+        self.tilemap = [[0] * self.level_width for i in range(self.level_height)]
+        self.decomap = [[0] * self.level_width for i in range(self.level_height)]
+        self.collider = [[0] * (self.level_width * 2) for i in range(self.level_height * 2)]
+        self.default_start = [0, 0]
+        self.lightmap = []
+        self.loading_zones = []
+
+    def load_from_json(self, data):
+        """Load level data from a JSON representation"""
+        self.tilemap = data["tilemap"]
+        self.decomap = data["decomap"]
+        self.collider = data["colliders"]
+        self.loading_zones = data["loading_zones"]
+        self.lightmap = data["lightmap"]
+        self.default_start = data["spawn"]
+        self.name = data["name"]
+        self.level_width = len(self.tilemap[0])
+        self.level_height = len(self.tilemap)
+
+    def jsonify(self):
+        """Convert the level to a JSON representation"""
+        return json.dumps({"tilemap": self.tilemap,
+                           "decomap": self.decomap,
+                           "colliders": self.collider,
+                           "loading_zones": self.loading_zones,
+                           "lightmap": self.lightmap,
+                           "spawn": self.default_start,
+                           "name": self.name})
 
 
 class SelectionPane(tk.Frame):
