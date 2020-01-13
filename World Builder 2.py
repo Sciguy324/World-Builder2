@@ -83,6 +83,14 @@ class Dialog(tk.Toplevel):
         pass
 
 
+# TODO: Add collision geometry editor dialog
+# TODO: Add tile group editor dialog
+# TODO: Add tile assembly group editor dialog
+# TODO: Add tile assembly editor dialog
+# TODO: Add pattern editor dialog
+# TODO: Add tilemap row/column editor dialog
+
+
 class CustomButton(ttk.Button):
     """A ttk button that has special effects"""
 
