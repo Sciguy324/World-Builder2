@@ -7,6 +7,82 @@ from os import path
 import json
 
 
+class Dialog(tk.Toplevel):
+    """General class for dialogs"""
+
+    def __init__(self, parent, title=None, **kwargs):
+        tk.Toplevel.__init__(self, parent)
+        self.transient(parent)
+
+        # Initialize class variables
+        self.parent = parent
+        self.result = None
+
+        # Set up basic window geometry
+        if title:
+            self.title(title)
+        self.frame = tk.Frame(self)
+        self.initial_focus = self.body()
+        self.frame.pack(padx=5, pady=5)
+        self.buttons()
+
+        # Adjust some configurations
+        self.grab_set()
+        if not self.initial_focus:
+            self.initial_focus = self
+        self.protocol("WM_DELETE_WINDOW", self.cancel)
+        self.initial_focus.focus_set()
+
+        self.wait_window(self)
+
+    def body(self):
+        """Create the dialog body.  Override in subclass"""
+        pass
+
+    def buttons(self):
+        """Add OK and CANCEL buttons.  Override in subclass"""
+        frame = tk.Frame(self)
+
+        # Create the OK button
+        ok_button = tk.Button(frame, text="OK", width=10, command=self.ok, default=tk.ACTIVE)
+        ok_button.pack(side=tk.LEFT, padx=5, pady=5)
+
+        # Create the CANCEL button
+        cancel_button = tk.Button(frame, text="CANCEL", width=10, command=self.cancel)
+        cancel_button.pack(side=tk.LEFT, padx=5, pady=5)
+
+        # Bind some shortcuts
+        self.bind("<Return>", self.ok)
+        self.bind("<Escape>", self.cancel)
+
+        frame.pack()
+
+    def ok(self, event=None):
+        """Event callback for pressing the OK button"""
+        # Check if fields are valid
+        if not self.validate():
+            return
+
+        self.withdraw()
+        self.update_idletasks()
+
+        self.apply()
+        self.cancel()
+
+    def cancel(self, event=None):
+        """Function to handle closing the window.  Override in subclass."""
+        self.parent.focus_set()
+        self.destroy()
+
+    def validate(self):
+        """Verify the output.  Override in subclass."""
+        return 1
+
+    def apply(self):
+        """Return the output.  Override in subclass."""
+        pass
+
+
 class CustomButton(ttk.Button):
     """A ttk button that has special effects"""
 
