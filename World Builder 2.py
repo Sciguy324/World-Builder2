@@ -10,7 +10,7 @@ import json
 class Dialog(tk.Toplevel):
     """General class for dialogs"""
 
-    def __init__(self, parent, title=None, **kwargs):
+    def __init__(self, parent, *args, title=None, **kwargs):
         tk.Toplevel.__init__(self, parent)
         self.transient(parent)
 
@@ -36,11 +36,11 @@ class Dialog(tk.Toplevel):
         self.wait_window(self)
 
     def body(self):
-        """Create the dialog body.  Override in subclass"""
+        """Create the dialog body.  Override in subclass."""
         pass
 
     def buttons(self):
-        """Add OK and CANCEL buttons.  Override in subclass"""
+        """Add OK and CANCEL buttons.  Override in subclass if unneeded."""
         frame = tk.Frame(self)
 
         # Create the OK button
@@ -58,14 +58,17 @@ class Dialog(tk.Toplevel):
         frame.pack()
 
     def ok(self, event=None):
-        """Event callback for pressing the OK button"""
+        """Event callback for pressing the OK button."""
+
         # Check if fields are valid
-        if not self.validate():
+        if not self.check():
             return
 
+        # Remove the window from the screen and update
         self.withdraw()
         self.update_idletasks()
 
+        # Apply the data entered in the fields and finally destroy the dialog window
         self.apply()
         self.cancel()
 
@@ -74,7 +77,7 @@ class Dialog(tk.Toplevel):
         self.parent.focus_set()
         self.destroy()
 
-    def validate(self):
+    def check(self):
         """Verify the output.  Override in subclass."""
         return 1
 
@@ -83,12 +86,74 @@ class Dialog(tk.Toplevel):
         pass
 
 
+class DataSetDialog(Dialog):
+
+    def __init__(self, parent, fields, title=None, **kwargs):
+        # Check 'fields' validity before proceeding
+        # Check if fields is a dictionary
+        if type(fields) == dict:
+            fields = [fields]
+        # Check if fields is a list of either length zero or of dictionaries
+        if type(fields) == list and (len(fields) == 0 or all([type(i) == dict for i in fields])):
+            pass
+        else:
+            raise ValueError("Unsupported type '{},' fields must be a dictionary or a list of dictionaries".
+                             format(type(fields)))
+        self.fields = fields
+        self.button_set = []
+        super().__init__(parent, title=title, **kwargs)
+
+    def body(self):
+        """Create the body of the dialog"""
+        for i, j in enumerate(self.fields):
+            c = 0
+            self.button_set.append({})
+            for k, m in j.items():
+                label = tk.Label(self.frame, text=str(k))
+                label.grid(row=i, column=c)
+                c += 1
+                self.button_set[i][k] = tk.Entry(self.frame)
+                self.button_set[i][k].insert(0, str(m))
+                self.button_set[i][k].grid(row=i, column=c)
+                c += 1
+
+    def check(self):
+        """Check if the fields are valid"""
+        return True
+
+    def apply(self):
+        """Update self.result with the data entered in the fields"""
+        self.result = []
+        for i, j in enumerate(self.fields):
+            self.result.append({})
+            for k, m in j.items():
+                self.result[i][k] = self.button_set[i][k].get()
+
+
+class NumberSetDialog(DataSetDialog):
+
+    def __init__(self, parent, fields, title=None, **kwargs):
+        super().__init__(parent, fields, title, **kwargs)
+
+    def check(self):
+        """Check if all fields are a number"""
+        for i in self.button_set:
+            for j, k in i.items():
+                try:
+                    int(k.get())
+                    float(k.get())
+                except ValueError:
+                    return False
+        return True
+
+
 # TODO: Add collision geometry editor dialog
 # TODO: Add tile group editor dialog
 # TODO: Add tile assembly group editor dialog
 # TODO: Add tile assembly editor dialog
 # TODO: Add pattern editor dialog
 # TODO: Add tilemap row/column editor dialog
+# TODO: Add default spawn position editor dialog
 
 
 class CustomButton(ttk.Button):
@@ -414,7 +479,7 @@ class TilemapEditorWindow(tk.Frame):
         self.editmenu.add_separator()
         self.editmenu.add_command(label="Change Tilemap Size", command=self.unimplemented)
         self.editmenu.add_separator()
-        self.editmenu.add_command(label="Set Default Spawn", command=self.unimplemented)
+        self.editmenu.add_command(label="Set Default Spawn", command=self._edit_default_spawn)
         self.menubar.add_cascade(label="Edit", menu=self.editmenu, command=self.unimplemented)
 
         # Create the tile menubar
@@ -459,6 +524,13 @@ class TilemapEditorWindow(tk.Frame):
     def _save_map_as(self, event=None):
         """Event callback for save a level as a new file"""
         self.view_list[self.tilemap_panel.index("current")].save_to_file(None)
+
+    def _edit_default_spawn(self, event=None):
+        """Event callback for setting the default spawn of the currently open level"""
+        input_data = self.view_list[self.tilemap_panel.index("current")].level.default_start
+        data = NumberSetDialog(self.master.master, [{"Col": input_data[0], "Row": input_data[1]}]).result
+        if data is not None:
+            self.view_list[self.tilemap_panel.index("current")].level.default_start = [data[0]["Col"], data[0]["Row"]]
 
     def new_view(self, event=None):
         """Create a new, blank view"""
@@ -849,8 +921,13 @@ class TilemapView(tk.Frame):
 
     def update_coords(self, event):
         """Event callback for updating the tilemap editor's coordinates"""
-        self.master.master.tile_coords_text.set("Row, Col: {}, {}".format(event.y // 64, event.x // 64))
-        self.master.master.level_coords_text.set("X, Y: {}, {}".format(event.x, event.y))
+        disp_x = (self.canvas.xview()[0] * self.level.level_width - int(self.master.master.border_mode.get()) + 1) * 64
+        disp_y = (self.canvas.yview()[0] * self.level.level_height - int(self.master.master.border_mode.get()) + 1) * 64
+        x = event.x + disp_x
+        y = event.y + disp_y
+
+        self.master.master.tile_coords_text.set("Col, Row: {:.0f}, {:.0f}".format(x // 64, y // 64))
+        self.master.master.level_coords_text.set("X, Y: {:.0f}, {:.0f}".format(event.x, event.y))
 
     def close(self):
         """Tells the view to close"""
@@ -1484,18 +1561,22 @@ class App:
             self.source.master.config(menu=self.menubar)
 
 
-if __name__ == "__main__":
+def main():
     root = tk.Tk()
     root.title("World Builder 2")
     icon = tk.PhotoImage("""R0lGODlhEAAQAKU7ABIaVhIbVxckXhgkXh0rZR0sZSEybCU3ciU4cik9eCxBfS5Fgy9Fgy9GgzFJ
-                            iDRNjTZQkjhUljlUljlUlztXmz1anz1aoJGRkZaWlZaWlpeXl5qbm5ubm5ycnJ+enp+foKCgoKGh
-                            oaKioqOjo6SkpKWlpaampqenp6mpqamqqqqqqqurq6ysrK2tra6urq+vr7Cvr7CxsbKysrS0tLW1
-                            tbq6us/Pz9nZ2dra2uTk5P///1J711J711J711J711J71yH+EUNyZWF0ZWQgd2l0aCBHSU1QACH5
-                            BAEKAD8ALAAAAAAQABAAAAZtwJ9wKPSMiEiiphMyJZEXDAdEWj2Hl8y0lHJdhZnNh6SCzb4/pkn1
-                            mtmuhYToxIrRbrokIeGYoFoyNTl5RAQIDBAWP202hEMDCA0QFUM1OEgCCAuTaAMHDA8UaAEGCqFo
-                            AKWnaKoRaEMOEq9CQQA7
-                            """)
+                                iDRNjTZQkjhUljlUljlUlztXmz1anz1aoJGRkZaWlZaWlpeXl5qbm5ubm5ycnJ+enp+foKCgoKGh
+                                oaKioqOjo6SkpKWlpaampqenp6mpqamqqqqqqqurq6ysrK2tra6urq+vr7Cvr7CxsbKysrS0tLW1
+                                tbq6us/Pz9nZ2dra2uTk5P///1J711J711J711J711J71yH+EUNyZWF0ZWQgd2l0aCBHSU1QACH5
+                                BAEKAD8ALAAAAAAQABAAAAZtwJ9wKPSMiEiiphMyJZEXDAdEWj2Hl8y0lHJdhZnNh6SCzb4/pkn1
+                                mtmuhYToxIrRbrokIeGYoFoyNTl5RAQIDBAWP202hEMDCA0QFUM1OEgCCAuTaAMHDA8UaAEGCqFo
+                                AKWnaKoRaEMOEq9CQQA7
+                                """)
 
-    main = App(root)
+    main_app = App(root)
 
     root.mainloop()
+
+
+if __name__ == "__main__":
+    main()
