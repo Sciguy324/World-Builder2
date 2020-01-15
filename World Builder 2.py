@@ -153,7 +153,6 @@ class NumberSetDialog(DataSetDialog):
 # TODO: Add tile assembly editor dialog
 # TODO: Add pattern editor dialog
 # TODO: Add tilemap row/column editor dialog
-# TODO: Add default spawn position editor dialog
 
 
 class CustomButton(ttk.Button):
@@ -1005,6 +1004,16 @@ class TilemapView(tk.Frame):
                 if m != 0:
                     self.canvas.create_image((k * 64 + 32, i * 64 + 32), image=TilemapEditorWindow.deco_dict[m])
 
+    def draw_loading_zones(self):
+        """Draw the loading zones"""
+        for i in self.level.loading_zones:
+            if i["target_level"] == "":
+                self.canvas.create_image((i["zone"][0] * 64 + 32, i["zone"][1] * 64 + 32),
+                                         image=TilemapView.imgs["inactive_zone"])
+            else:
+                self.canvas.create_image((i["zone"][0] * 64 + 32, i["zone"][1] * 64 + 32),
+                                         image=TilemapView.imgs["active_zone"])
+
     def draw_border(self):
         """Draw the border"""
         for i in range(self.level.level_width):
@@ -1025,8 +1034,7 @@ class TilemapView(tk.Frame):
         if self.master.master.layer.get() == 2:
             self.draw_collision()
         elif self.master.master.layer.get() == 3:
-            # TODO: Add loading zone layer
-            print("LOADING ZONE UNIMPLEMENTED")
+            self.draw_loading_zones()
         elif self.master.master.layer.get() == 4:
             # TODO: Add lightmap layer
             print("LIGHTMAP UNIMPLEMENTED")
@@ -1055,7 +1063,6 @@ class TilemapView(tk.Frame):
         """Does the actual work of setting the window's mode"""
         if value == 0:
             # Drawing controls
-            # self.canvas.unbind_all(["<ButtonPress-1>", "<B1-Motion>", "<ButtonRelease-1>"])
             for i in ["<ButtonPress-1>", "<B1-Motion>", "<ButtonRelease-1>"]:
                 self.canvas.unbind(i)
             # Tilemap mode
@@ -1072,7 +1079,8 @@ class TilemapView(tk.Frame):
                 self.canvas.bind("<ButtonRelease-1>", self._draw_collider_and_grid)
             # Loading zone mode
             elif self.master.master.layer.get() == 3:
-                pass
+                self.canvas.bind("<B1-Motion>", self.draw_zone)
+                self.canvas.bind("<ButtonRelease-1>", self._draw_zone_and_grid)
             # Lightmap mode
             elif self.master.master.layer.get() == 4:
                 pass
@@ -1081,8 +1089,6 @@ class TilemapView(tk.Frame):
             # Movement controls
             for i in ["<ButtonRelease-1>", "<ButtonPress-1>", "<B1-Motion>"]:
                 self.canvas.unbind(i)
-            # self.canvas.unbind("<ButtonRelease-1>")  # Manually unbind event because I don't know
-            # self.canvas.unbind_all(["<ButtonRelease-1>", "<ButtonPress-1>", "<B1-Motion>"])
             self.canvas.bind("<ButtonPress-1>", self.set_start)
             self.canvas.bind("<B1-Motion>", self.move)
             self.canvas.config(cursor="fleur")
@@ -1100,6 +1106,11 @@ class TilemapView(tk.Frame):
     def _draw_collider_and_grid(self, event):
         self.canvas.delete("all")
         self.draw_collider(event)
+        self.redraw_view()
+
+    def _draw_zone_and_grid(self, event):
+        self.canvas.delete("all")
+        self.draw_zone(event)
         self.redraw_view()
 
     def set_grid(self):
@@ -1128,8 +1139,8 @@ class TilemapView(tk.Frame):
     def draw_tile(self, event):
         """Event callback for drawing a tile on the grid"""
         # Determine the position at which to to draw the tile
-        tile_x = int(self.canvas.xview()[0] * len(self.level.tilemap[0]) + event.x / 64)
-        tile_y = int(self.canvas.yview()[0] * len(self.level.tilemap) + event.y / 64)
+        tile_x = int(self.canvas.xview()[0] * self.level.level_width + event.x / 64)
+        tile_y = int(self.canvas.yview()[0] * self.level.level_height + event.y / 64)
 
         border_mode = self.master.master.border_mode.get()
 
@@ -1138,13 +1149,13 @@ class TilemapView(tk.Frame):
             tile_y += 1
 
         # Check to make sure tile is actually on the screen.  If not, cancel drawing.
-        if event.y / 64 < int(self.canvas.yview()[0] * len(self.level.tilemap)):
+        if event.y / 64 < int(self.canvas.yview()[0] * self.level.level_height):
             return
-        if event.y / 64 + 0.1 > int(self.canvas.yview()[1] * len(self.level.tilemap) - 1 - int(not border_mode)):
+        if event.y / 64 + 0.1 > int(self.canvas.yview()[1] * self.level.level_height - 1 - int(not border_mode)):
             return
-        if event.x / 64 < int(self.canvas.xview()[0] * len(self.level.tilemap[0])):
+        if event.x / 64 < int(self.canvas.xview()[0] * self.level.level_width):
             return
-        if event.x / 64 + 0.1 > int(self.canvas.xview()[1] * len(self.level.tilemap[0]) - 1 - int(not border_mode)):
+        if event.x / 64 + 0.1 > int(self.canvas.xview()[1] * self.level.level_width - 1 - int(not border_mode)):
             return
 
         # Draw the tile
@@ -1159,8 +1170,8 @@ class TilemapView(tk.Frame):
     def draw_deco(self, event):
         """Draw either a tile or a deco on the grid, depending on the arguments"""
         # Determine the position at which to to draw the tile
-        tile_x = int(self.canvas.xview()[0] * len(self.level.decomap[0]) + event.x / 64)
-        tile_y = int(self.canvas.yview()[0] * len(self.level.decomap) + event.y / 64)
+        tile_x = int(self.canvas.xview()[0] * self.level.level_width + event.x / 64)
+        tile_y = int(self.canvas.yview()[0] * self.level.level_height + event.y / 64)
 
         border_mode = self.master.master.border_mode.get()
 
@@ -1169,13 +1180,13 @@ class TilemapView(tk.Frame):
             tile_y += 1
 
         # Check to make sure tile is actually on the screen.  If not, cancel drawing.
-        if event.y / 64 < int(self.canvas.yview()[0] * len(self.level.decomap)):
+        if event.y / 64 < int(self.canvas.yview()[0] * self.level.level_height):
             return
-        if event.y / 64 + 0.1 > int(self.canvas.yview()[1] * len(self.level.decomap) - 1 - int(not border_mode)):
+        if event.y / 64 + 0.1 > int(self.canvas.yview()[1] * self.level.level_height - 1 - int(not border_mode)):
             return
-        if event.x / 64 < int(self.canvas.xview()[0] * len(self.level.decomap[0])):
+        if event.x / 64 < int(self.canvas.xview()[0] * self.level.level_width):
             return
-        if event.x / 64 + 0.1 > int(self.canvas.xview()[1] * len(self.level.decomap[0]) - 1 - int(not border_mode)):
+        if event.x / 64 + 0.1 > int(self.canvas.xview()[1] * self.level.level_width - 1 - int(not border_mode)):
             return
 
         # Draw the tile
@@ -1228,6 +1239,52 @@ class TilemapView(tk.Frame):
             self.level.collider[tile_y][tile_x] = 1
         except IndexError:
             pass
+
+    def draw_zone(self, event):
+        """Event callback for editing loading zones"""
+        # Determine the position at which to to draw the tile
+        tile_x = int(self.canvas.xview()[0] * self.level.level_width + event.x / 64)
+        tile_y = int(self.canvas.yview()[0] * self.level.level_height + event.y / 64)
+
+        border_mode = self.master.master.border_mode.get()
+
+        if not border_mode:
+            tile_x += 1
+            tile_y += 1
+
+        # Check to make sure tile is actually on the screen.  If not, cancel drawing.
+        if event.y / 64 < int(self.canvas.yview()[0] * self.level.level_height):
+            return
+        if event.y / 64 + 0.1 > int(self.canvas.yview()[1] * self.level.level_height - 1 - int(not border_mode)):
+            return
+        if event.x / 64 < int(self.canvas.xview()[0] * self.level.level_width):
+            return
+        if event.x / 64 + 0.1 > int(self.canvas.xview()[1] * self.level.level_width - 1 - int(not border_mode)):
+            return
+
+        mode = self.master.master.loading_id.get()
+        if mode == 0:
+            self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
+                                     image=TilemapEditorWindow.imgs["delete_zone"])
+            # Delete the zone
+            if self.level.check_zone(tile_x, tile_y):
+                self.level.remove_zone(tile_x, tile_y)
+        elif mode == 1:
+            # Add a new zone
+            if not self.level.check_zone(tile_x, tile_y):
+                self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
+                                         image=TilemapView.imgs["inactive_zone"])
+                self.level.loading_zones.append({"zone": [tile_x, tile_y], "target_level": "", "target_pos": [0, 0]})
+        elif mode == 2:
+            # Edit an existing zone
+            if self.level.check_zone(tile_x, tile_y):
+                self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
+                                         image=TilemapEditorWindow.imgs["configure_zone"])
+                data = self.level.get_zone(tile_x, tile_y)
+                DataSetDialog(self, [{"Target X": data["target_pos"][0], "Target Y": data["target_pos"][1]},
+                                     {"Target Level:": data["target_level"]}])
+
+        print("Loading zones:", self.level.loading_zones)
 
     def set_start(self, event):
         """Set the starting position for dragging the canvas around"""
@@ -1338,6 +1395,27 @@ class Level:
                            "lightmap": self.lightmap,
                            "spawn": self.default_start,
                            "name": self.name})
+
+    def check_zone(self, x, y):
+        """Check if there is a loading zone at X, Y"""
+        for i in self.loading_zones:
+            if i["zone"][0] == x and i["zone"][1] == y:
+                return True
+        return False
+
+    def get_zone(self, x, y):
+        """Retrieve the data from the loading zone at X, Y"""
+        for i in self.loading_zones:
+            if i["zone"][0] == x and i["zone"][1] == y:
+                return i
+        return None
+
+    def remove_zone(self, x, y):
+        """Remove the loading zone at X, Y"""
+        for i, j in enumerate(self.loading_zones):
+            if j["zone"][0] == x and j["zone"][1] == y:
+                self.loading_zones.pop(i)
+                return
 
 
 class SelectionPane(tk.Frame):
