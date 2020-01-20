@@ -1006,12 +1006,12 @@ class TilemapView(tk.Frame):
 
     def draw_loading_zones(self):
         """Draw the loading zones"""
-        for i in self.level.loading_zones:
-            if i["target_level"] == "":
-                self.canvas.create_image((i["zone"][0] * 64 + 32, i["zone"][1] * 64 + 32),
+        for i, j in self.level.loading_zones.items():
+            if j.target_level == "":
+                self.canvas.create_image((i[0] * 64 + 32, i[1] * 64 + 32),
                                          image=TilemapView.imgs["inactive_zone"])
             else:
-                self.canvas.create_image((i["zone"][0] * 64 + 32, i["zone"][1] * 64 + 32),
+                self.canvas.create_image((i[0] * 64 + 32, i[1] * 64 + 32),
                                          image=TilemapView.imgs["active_zone"])
 
     def draw_border(self):
@@ -1031,10 +1031,13 @@ class TilemapView(tk.Frame):
         self.draw_decomap()
 
         # Draw layer-specific stuff (self.master.master.layer.get())
+        # Draw collision layer if enabled
         if self.master.master.layer.get() == 2:
             self.draw_collision()
+        # Draw loading zones layer if enabled
         elif self.master.master.layer.get() == 3:
             self.draw_loading_zones()
+        # Draw lightmap layer if enabled
         elif self.master.master.layer.get() == 4:
             # TODO: Add lightmap layer
             print("LIGHTMAP UNIMPLEMENTED")
@@ -1267,22 +1270,27 @@ class TilemapView(tk.Frame):
             self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
                                      image=TilemapEditorWindow.imgs["delete_zone"])
             # Delete the zone
-            if self.level.check_zone(tile_x, tile_y):
-                self.level.remove_zone(tile_x, tile_y)
+            if (tile_x, tile_y) in self.level.loading_zones:
+                self.level.loading_zones.pop((tile_x, tile_y))
         elif mode == 1:
             # Add a new zone
-            if not self.level.check_zone(tile_x, tile_y):
+            if (tile_x, tile_y) not in self.level.loading_zones:
                 self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
                                          image=TilemapView.imgs["inactive_zone"])
-                self.level.loading_zones.append({"zone": [tile_x, tile_y], "target_level": "", "target_pos": [0, 0]})
+                self.level.loading_zones[tile_x, tile_y] = LoadingZone("", [0, 0])
         elif mode == 2:
             # Edit an existing zone
-            if self.level.check_zone(tile_x, tile_y):
+            if (tile_x, tile_y) in self.level.loading_zones:
                 self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
                                          image=TilemapEditorWindow.imgs["configure_zone"])
-                data = self.level.get_zone(tile_x, tile_y)
-                DataSetDialog(self, [{"Target X": data["target_pos"][0], "Target Y": data["target_pos"][1]},
-                                     {"Target Level:": data["target_level"]}])
+                data = self.level.loading_zones[tile_x, tile_y]
+                new_data = DataSetDialog(self, [{"Target X": data.target_pos[0], "Target Y": data.target_pos[1]},
+                                                {"Target Level": data.target_level}]).result
+                if new_data is not None:
+                    self.level.loading_zones[tile_x, tile_y].target_pos = [new_data[0]["Target X"],
+                                                                           new_data[0]["Target Y"]]
+                    self.level.loading_zones[tile_x, tile_y].target_level = new_data[1]["Target Level"]
+            self.redraw_view()
 
         print("Loading zones:", self.level.loading_zones)
 
@@ -1372,14 +1380,17 @@ class Level:
         self.collider = [[0] * (self.level_width * 2) for i in range(self.level_height * 2)]
         self.default_start = [0, 0]
         self.lightmap = []
-        self.loading_zones = []
+        self.loading_zones = LoadingZoneDict()
 
     def load_from_json(self, data):
         """Load level data from a JSON representation"""
         self.tilemap = data["tilemap"]
         self.decomap = data["decomap"]
         self.collider = data["colliders"]
-        self.loading_zones = data["loading_zones"]
+        self.loading_zones = LoadingZoneDict()
+        for i in data["loading_zones"]:
+            self.loading_zones[i["zone"]] = LoadingZone(i["target_level"], i["target_pos"])
+        # self.loading_zones = data["loading_zones"]
         self.lightmap = data["lightmap"]
         self.default_start = data["spawn"]
         self.name = data["name"]
@@ -1391,31 +1402,93 @@ class Level:
         return json.dumps({"tilemap": self.tilemap,
                            "decomap": self.decomap,
                            "colliders": self.collider,
-                           "loading_zones": self.loading_zones,
+                           "loading_zones": self.loading_zones.jsonify(),
                            "lightmap": self.lightmap,
                            "spawn": self.default_start,
                            "name": self.name})
 
-    def check_zone(self, x, y):
-        """Check if there is a loading zone at X, Y"""
-        for i in self.loading_zones:
-            if i["zone"][0] == x and i["zone"][1] == y:
-                return True
-        return False
+    # def check_zone(self, x, y):
+    #     """Check if there is a loading zone at X, Y"""
+    #     for i in self.loading_zones:
+    #         if i["zone"][0] == x and i["zone"][1] == y:
+    #             return True
+    #     return False
+    #
+    # def get_zone(self, x, y):
+    #     """Retrieve the data from the loading zone at X, Y"""
+    #     for i in self.loading_zones:
+    #         if i["zone"][0] == x and i["zone"][1] == y:
+    #             return i
+    #     return None
+    #
+    # def remove_zone(self, x, y):
+    #     """Remove the loading zone at X, Y"""
+    #     for i, j in enumerate(self.loading_zones):
+    #         if j["zone"][0] == x and j["zone"][1] == y:
+    #             self.loading_zones.pop(i)
+    #             return
 
-    def get_zone(self, x, y):
-        """Retrieve the data from the loading zone at X, Y"""
-        for i in self.loading_zones:
-            if i["zone"][0] == x and i["zone"][1] == y:
-                return i
-        return None
 
-    def remove_zone(self, x, y):
-        """Remove the loading zone at X, Y"""
-        for i, j in enumerate(self.loading_zones):
-            if j["zone"][0] == x and j["zone"][1] == y:
-                self.loading_zones.pop(i)
-                return
+class LoadingZone:
+    """Data structure for loading zones"""
+
+    def __init__(self, target_level, target_pos):
+        self.target_level = target_level
+        self.target_pos = target_pos
+
+    def __repr__(self):
+        """Return a string representation of the loading zone"""
+        return "<Loading Zone | target: {} at {}>".format(self.target_level, self.target_pos)
+
+
+class LoadingZoneDict:
+    """Data structure for loading zone lists"""
+
+    # Structure:
+    # [{"zone":[x, y], "target_level": "Level Name", "target_pos": [x, y]},{}...]
+
+    def __init__(self):
+        super().__init__()
+        self.data = {}
+
+    def __repr__(self):
+        return self.data.__repr__()
+
+    def __getitem__(self, key):
+        """Obtain the loading zone given by 'key'"""
+        if type(key) == tuple and len(key) == 2 and type(key[0]) == int and type(key[1]) == int:
+            return self.data[key]
+        else:
+            raise TypeError("Key must be a pair of integers!")
+
+    def __setitem__(self, key, value):
+        """Modify/create the loading zone given by 'key'"""
+        if type(key) == tuple and len(key) == 2 and type(key[0]) == int and type(key[1]) == int:
+            if type(value) == LoadingZone:
+                self.data[key] = value
+            else:
+                raise TypeError("Value must be a loading zone!")
+        else:
+            raise TypeError("Key must be a pair of integers!")
+
+    def __contains__(self, key):
+        """Check if the dictionary contains a loading zones with 'key'"""
+        return key in self.data
+
+    def pop(self, key):
+        """Remove the loading zone given by 'key'"""
+        return self.data.pop(key)
+
+    def items(self):
+        return self.data.items()
+
+    def jsonify(self):
+        """Convert into a list representation reading for use in a JSON tag"""
+        result = []
+        for i, j in self.data.items():
+            result.append({"zone": list(i),
+                           "target_level": j.target_level,
+                           "target_pos": j.target_pos})
 
 
 class SelectionPane(tk.Frame):
