@@ -883,6 +883,8 @@ class TilemapView(tk.Frame):
         self.start_y = 0
         self.saved = False
         self.current_tile = 0
+        self.copied_zone = None
+        self.copied_zone_coords = None
 
         # Declare the tilemap data
         self.level = Level()
@@ -1070,18 +1072,22 @@ class TilemapView(tk.Frame):
                 self.canvas.unbind(i)
             # Tilemap mode
             if self.master.master.layer.get() == 0:
+                self.canvas.bind("<ButtonPress-1>", self.draw_tile)
                 self.canvas.bind("<B1-Motion>", self.draw_tile)
                 self.canvas.bind("<ButtonRelease-1>", self._draw_tile_and_grid)
             # Decomap mode
             elif self.master.master.layer.get() == 1:
+                self.canvas.bind("<ButtonPress-1>", self.draw_deco)
                 self.canvas.bind("<B1-Motion>", self.draw_deco)
                 self.canvas.bind("<ButtonRelease-1>", self._draw_deco_and_grid)
             # Collision map mode
             elif self.master.master.layer.get() == 2:
+                self.canvas.bind("<ButtonPress-1>", self.draw_collider)
                 self.canvas.bind("<B1-Motion>", self.draw_collider)
                 self.canvas.bind("<ButtonRelease-1>", self._draw_collider_and_grid)
             # Loading zone mode
             elif self.master.master.layer.get() == 3:
+                self.canvas.bind("<ButtonPress-1>", self.draw_zone)
                 self.canvas.bind("<B1-Motion>", self.draw_zone)
                 self.canvas.bind("<ButtonRelease-1>", self._draw_zone_and_grid)
             # Lightmap mode
@@ -1267,9 +1273,9 @@ class TilemapView(tk.Frame):
 
         mode = self.master.master.loading_id.get()
         if mode == 0:
+            # Delete the zone
             self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
                                      image=TilemapEditorWindow.imgs["delete_zone"])
-            # Delete the zone
             if (tile_x, tile_y) in self.level.loading_zones:
                 self.level.loading_zones.pop((tile_x, tile_y))
         elif mode == 1:
@@ -1287,12 +1293,34 @@ class TilemapView(tk.Frame):
                 new_data = DataSetDialog(self, [{"Target X": data.target_pos[0], "Target Y": data.target_pos[1]},
                                                 {"Target Level": data.target_level}]).result
                 if new_data is not None:
-                    self.level.loading_zones[tile_x, tile_y].target_pos = [new_data[0]["Target X"],
-                                                                           new_data[0]["Target Y"]]
+                    self.level.loading_zones[tile_x, tile_y].target_pos = [int(new_data[0]["Target X"]),
+                                                                           int(new_data[0]["Target Y"])]
                     self.level.loading_zones[tile_x, tile_y].target_level = new_data[1]["Target Level"]
             self.redraw_view()
+        elif mode == 3:
+            # Copy the existing zone
+            self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
+                                     image=TilemapEditorWindow.imgs["copy_zone"])
+            if (tile_x, tile_y) in self.level.loading_zones:
+                self.copied_zone = self.level.loading_zones[tile_x, tile_y].copy()
+                self.copied_zone_coords = [tile_x, tile_y]
+        elif mode == 4:
+            # Paste the copied zone
+            self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
+                                     image=TilemapEditorWindow.imgs["paste_zone"])
+            if self.copied_zone is not None:
+                self.level.loading_zones[tile_x, tile_y] = self.copied_zone.copy()
+        elif mode == 5:
+            # Extend the copied zone
+            self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
+                                     image=TilemapEditorWindow.imgs["extend_zone"])
+            if self.copied_zone is not None:
+                new_zone = self.copied_zone.copy()
+                new_zone.target_pos[0] += tile_x - self.copied_zone_coords[0]
+                new_zone.target_pos[1] += tile_y - self.copied_zone_coords[1]
+                self.level.loading_zones[tile_x, tile_y] = new_zone
 
-        print("Loading zones:", self.level.loading_zones)
+        # print("Loading zones:", self.level.loading_zones)
 
     def set_start(self, event):
         """Set the starting position for dragging the canvas around"""
@@ -1407,27 +1435,6 @@ class Level:
                            "spawn": self.default_start,
                            "name": self.name})
 
-    # def check_zone(self, x, y):
-    #     """Check if there is a loading zone at X, Y"""
-    #     for i in self.loading_zones:
-    #         if i["zone"][0] == x and i["zone"][1] == y:
-    #             return True
-    #     return False
-    #
-    # def get_zone(self, x, y):
-    #     """Retrieve the data from the loading zone at X, Y"""
-    #     for i in self.loading_zones:
-    #         if i["zone"][0] == x and i["zone"][1] == y:
-    #             return i
-    #     return None
-    #
-    # def remove_zone(self, x, y):
-    #     """Remove the loading zone at X, Y"""
-    #     for i, j in enumerate(self.loading_zones):
-    #         if j["zone"][0] == x and j["zone"][1] == y:
-    #             self.loading_zones.pop(i)
-    #             return
-
 
 class LoadingZone:
     """Data structure for loading zones"""
@@ -1439,6 +1446,10 @@ class LoadingZone:
     def __repr__(self):
         """Return a string representation of the loading zone"""
         return "<Loading Zone | target: {} at {}>".format(self.target_level, self.target_pos)
+
+    def copy(self):
+        """Return a copy of the loading zone"""
+        return LoadingZone(str(self.target_level), [self.target_pos[0], self.target_pos[1]])
 
 
 class LoadingZoneDict:
