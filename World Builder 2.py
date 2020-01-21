@@ -1158,13 +1158,13 @@ class TilemapView(tk.Frame):
             tile_y += 1
 
         # Check to make sure tile is actually on the screen.  If not, cancel drawing.
-        if event.y / 64 < int(self.canvas.yview()[0] * self.level.level_height):
+        if event.y / 64 < 0.1:
             return
-        if event.y / 64 + 0.1 > int(self.canvas.yview()[1] * self.level.level_height - 1 - int(not border_mode)):
+        if event.y / 64 > 8.9:
             return
-        if event.x / 64 < int(self.canvas.xview()[0] * self.level.level_width):
+        if event.x / 64 < 0.1:
             return
-        if event.x / 64 + 0.1 > int(self.canvas.xview()[1] * self.level.level_width - 1 - int(not border_mode)):
+        if event.x / 64 > 15.9:
             return
 
         # Draw the tile
@@ -1189,13 +1189,13 @@ class TilemapView(tk.Frame):
             tile_y += 1
 
         # Check to make sure tile is actually on the screen.  If not, cancel drawing.
-        if event.y / 64 < int(self.canvas.yview()[0] * self.level.level_height):
+        if event.y / 64 < 0.1:
             return
-        if event.y / 64 + 0.1 > int(self.canvas.yview()[1] * self.level.level_height - 1 - int(not border_mode)):
+        if event.y / 64 > 8.9:
             return
-        if event.x / 64 < int(self.canvas.xview()[0] * self.level.level_width):
+        if event.x / 64 < 0.1:
             return
-        if event.x / 64 + 0.1 > int(self.canvas.xview()[1] * self.level.level_width - 1 - int(not border_mode)):
+        if event.x / 64 > 15.9:
             return
 
         # Draw the tile
@@ -1225,16 +1225,16 @@ class TilemapView(tk.Frame):
 
         # Check to make sure tile is actually on the screen.  If not, cancel drawing.
         # Top side catch
-        if event.y / 32 < int(self.canvas.yview()[0] * len(self.level.collider)):
+        if event.y / 32 < 0.1:
             return
         # Bottom side catch
-        if event.y / 32 + 0.2 > int(self.canvas.yview()[1] * len(self.level.collider) - 1 - 2 * int(not border)):
+        if event.y / 32 > 8.9:
             return
         # Left size catch
-        if event.x / 32 < int(self.canvas.xview()[0] * len(self.level.collider[0])):
+        if event.x / 32 < 0.1:
             return
         # Right side catch
-        if event.x / 32 + 0.2 > int(self.canvas.xview()[1] * len(self.level.collider[0]) - 1 - 2 * int(not border)):
+        if event.x / 32 > 15.9:
             return
 
         # Draw the tile
@@ -1262,13 +1262,13 @@ class TilemapView(tk.Frame):
             tile_y += 1
 
         # Check to make sure tile is actually on the screen.  If not, cancel drawing.
-        if event.y / 64 < int(self.canvas.yview()[0] * self.level.level_height):
+        if event.y / 64 < 0.1:
             return
-        if event.y / 64 + 0.1 > int(self.canvas.yview()[1] * self.level.level_height - 1 - int(not border_mode)):
+        if event.y / 64 > 8.9:
             return
-        if event.x / 64 < int(self.canvas.xview()[0] * self.level.level_width):
+        if event.x / 64 < 0.1:
             return
-        if event.x / 64 + 0.1 > int(self.canvas.xview()[1] * self.level.level_width - 1 - int(not border_mode)):
+        if event.x / 64 > 15.9:
             return
 
         mode = self.master.master.loading_id.get()
@@ -1417,8 +1417,7 @@ class Level:
         self.collider = data["colliders"]
         self.loading_zones = LoadingZoneDict()
         for i in data["loading_zones"]:
-            self.loading_zones[i["zone"]] = LoadingZone(i["target_level"], i["target_pos"])
-        # self.loading_zones = data["loading_zones"]
+            self.loading_zones[i["zone"][0], i["zone"][1]] = LoadingZone(i["target_level"], i["target_pos"])
         self.lightmap = data["lightmap"]
         self.default_start = data["spawn"]
         self.name = data["name"]
