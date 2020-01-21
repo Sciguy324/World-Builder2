@@ -14,14 +14,14 @@ Core Feature Elaboration:
 		--Can have multiple tilemaps open at once
 		--Tile selection pane (right)
 		-Buttons and key shortcuts for:
-			-Draw
+			--Draw
 			--Move
 			--Show/hide grid
 			--Toggle border visibility
 			--Tilemap layer
 			--Decoration layer
 			--Collision map
-			-Loading zone layer
+			--Loading zone layer
 			-Lighting layer
 			-Switching between panels for individual tiles and tile assemblies
 			--Dropdown box for selecting tile group

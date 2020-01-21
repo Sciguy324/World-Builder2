@@ -117,8 +117,46 @@
     }
   ],
   "lightmap": [
-    [ 25.0, 5.0 ],
-    [ 29.0, 5.0 ]
+    {
+      "pos": [ 25.0, 5.0 ],
+      "diameter": 4,
+      "blacklight": false,
+      "red": {
+        "amplitude": 255,
+        "inner_diameter": 16,
+        "outer_diameter": 256
+      },
+      "blue": {
+        "amplitude": 192,
+        "inner_diameter": 16,
+        "outer_diameter": 256
+      },
+      "green": {
+        "amplitude": 0,
+        "inner_diameter": 16,
+        "outer_diameter": 256
+      }
+    },
+    {
+      "pos":  [29.0, 5.0],
+      "diameter": 4,
+      "blacklight": false,
+      "red": {
+       "amplitude": 255,
+       "inner_diameter": 16,
+       "outer_diameter": 256
+     },
+      "blue": {
+       "amplitude": 192,
+       "inner_diameter": 16,
+       "outer_diameter": 256
+     },
+      "green": {
+       "amplitude": 0,
+       "inner_diameter": 16,
+       "outer_diameter": 256
+     }
+    }
   ],
   "spawn": [ 11, 10 ],
   "name": "demo"

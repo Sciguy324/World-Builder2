@@ -680,7 +680,7 @@ class TilemapEditorWindow(tk.Frame):
                                                        relief=tk.SUNKEN)}
 
         self.panes["light"] = {"All": TileCollection(self.selection_frame,
-                                                     [0],
+                                                     [0, 1, 2, 3, 4],
                                                      "light",
                                                      self.light_id,
                                                      borderwidth=1,
@@ -805,6 +805,16 @@ class TilemapEditorWindow(tk.Frame):
             JSb2HSMpoNRAAA7
             '''
 
+        new_light = '''R0lGODlhEAAQAMIEAAAAAFVVVaqqquzkAADhAADhAADhAADhACH5BAEKA
+            AQALAAAAAAQABAAAAM0\nOEOk7G2xSeuzCk7dqNxgd1ldNorjp35o27IsKcUxAShAxdl
+            Aj1WAgCBHAhI9RRlkOZMkAAA7
+            '''
+
+        edit_light = '''R0lGODlhEAAQAMIDAAAAADw8PACzAADhAADhAADhAADhAADhACH5BAEK
+            AAQALAAAAAAQABAAAAM3\nKEKk7G2xSeujANgJCRja1hCB9oViAJ6bRA4wSnVBDbaWKo
+            uMPvO+hyt3uwCLvEltlJxBnhJIAgA7
+            '''
+
         # Add embedded images to the image dictionary
         cls.imgs = {"add_new": tk.PhotoImage("img_addnew_active", data=addnew_data),
                     "draw": tk.PhotoImage("img_draw_tool", data=draw_tool_data),
@@ -816,22 +826,30 @@ class TilemapEditorWindow(tk.Frame):
                     "collider_layer": tk.PhotoImage("img_collide_layer", data=collision_layer_data),
                     "loading_layer": tk.PhotoImage("img_load_layer", data=loading_layer_data),
                     "light_layer": tk.PhotoImage("img_light_layer", data=light_layer_data),
-                    "delete_zone": tk.PhotoImage("img_del_zone", data=delete_zone).zoom(64).subsample(16),
+                    "delete": tk.PhotoImage("img_delete", data=delete_zone).zoom(64).subsample(16),
                     "new_zone": tk.PhotoImage("img_new_zone", data=new_zone).zoom(64).subsample(16),
                     "configure_zone": tk.PhotoImage("img_edit_zone", data=configure_zone).zoom(64).subsample(16),
-                    "copy_zone": tk.PhotoImage("img_copy_zone", data=copy_zone).zoom(64).subsample(16),
-                    "paste_zone": tk.PhotoImage("img_paste_zone", data=paste_zone).zoom(64).subsample(16),
-                    "extend_zone": tk.PhotoImage("img_paste_zone", data=extend_zone).zoom(64).subsample(16)}
+                    "copy": tk.PhotoImage("img_copy", data=copy_zone).zoom(64).subsample(16),
+                    "paste": tk.PhotoImage("img_paste", data=paste_zone).zoom(64).subsample(16),
+                    "extend_zone": tk.PhotoImage("img_paste_zone", data=extend_zone).zoom(64).subsample(16),
+                    "new_light": tk.PhotoImage("img_new_light", data=new_light).zoom(64).subsample(16),
+                    "edit_light": tk.PhotoImage("img_edit_light", data=edit_light).zoom(64).subsample(16)
+                    }
 
-        cls.loading_dict = [cls.imgs["delete_zone"],
+        cls.loading_dict = [cls.imgs["delete"],
                             cls.imgs["new_zone"],
                             cls.imgs["configure_zone"],
-                            cls.imgs["copy_zone"],
-                            cls.imgs["paste_zone"],
-                            cls.imgs["extend_zone"]]
+                            cls.imgs["copy"],
+                            cls.imgs["paste"],
+                            cls.imgs["extend_zone"],
+                            ]
 
-        # TODO: Add light images
-        cls.light_dict = [cls.imgs["delete_zone"]]
+        cls.light_dict = [cls.imgs["delete"],
+                          cls.imgs["new_light"],
+                          cls.imgs["edit_light"],
+                          cls.imgs["copy"],
+                          cls.imgs["paste"]
+                          ]
 
         # Open the ids.json file to start loading the tiles/decos
         try:
@@ -1016,6 +1034,16 @@ class TilemapView(tk.Frame):
                 self.canvas.create_image((i[0] * 64 + 32, i[1] * 64 + 32),
                                          image=TilemapView.imgs["active_zone"])
 
+    def draw_lights(self):
+        """Draw the lights"""
+        for i, j in self.level.lightmap.items():
+            if j.active:
+                self.canvas.create_image((i[0] * 64 + 32, i[1] * 64 + 32),
+                                         image=TilemapView.imgs["active_light"])
+            else:
+                self.canvas.create_image((i[0] * 64 + 32, i[1] * 64 + 32),
+                                         image=TilemapView.imgs["inactive_light"])
+
     def draw_border(self):
         """Draw the border"""
         for i in range(self.level.level_width):
@@ -1042,7 +1070,7 @@ class TilemapView(tk.Frame):
         # Draw lightmap layer if enabled
         elif self.master.master.layer.get() == 4:
             # TODO: Add lightmap layer
-            print("LIGHTMAP UNIMPLEMENTED")
+            self.draw_lights()
 
         # Redraw the grid if enabled (self.master.master.grid_mode.get()=1)
         if self.master.master.grid_mode.get():
@@ -1275,7 +1303,7 @@ class TilemapView(tk.Frame):
         if mode == 0:
             # Delete the zone
             self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
-                                     image=TilemapEditorWindow.imgs["delete_zone"])
+                                     image=TilemapEditorWindow.imgs["delete"])
             if (tile_x, tile_y) in self.level.loading_zones:
                 self.level.loading_zones.pop((tile_x, tile_y))
         elif mode == 1:
@@ -1300,14 +1328,14 @@ class TilemapView(tk.Frame):
         elif mode == 3:
             # Copy the existing zone
             self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
-                                     image=TilemapEditorWindow.imgs["copy_zone"])
+                                     image=TilemapEditorWindow.imgs["copy"])
             if (tile_x, tile_y) in self.level.loading_zones:
                 self.copied_zone = self.level.loading_zones[tile_x, tile_y].copy()
                 self.copied_zone_coords = [tile_x, tile_y]
         elif mode == 4:
             # Paste the copied zone
             self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
-                                     image=TilemapEditorWindow.imgs["paste_zone"])
+                                     image=TilemapEditorWindow.imgs["paste"])
             if self.copied_zone is not None:
                 self.level.loading_zones[tile_x, tile_y] = self.copied_zone.copy()
         elif mode == 5:
@@ -1381,19 +1409,33 @@ class TilemapView(tk.Frame):
             0hKUooqJ5fWrUvutKuOXN3UwAAOw==
             ''').zoom(64).subsample(16)
 
-        inactive_zone = tk.PhotoImage("img_border_tile", data='''R0lGODlhEAAQAKE
+        inactive_zone = tk.PhotoImage("img_inactive_zone", data='''R0lGODlhEAAQAKE
             CAAAAAMMAAACPAACPACH5BAEKAAIALAAAAAAQABAAAAI2TCSGmocP44qgWshE\nNabiB
             wRWCEgIeYqPc5YaurAg6U6UWJtpnpgXJtOtfMIbLwiScGLMBqIAADs=
             ''').zoom(64).subsample(16)
 
-        active_zone = tk.PhotoImage("img_border_tile", data='''R0lGODlhEAAQAKEBA
+        active_zone = tk.PhotoImage("img_active_zone", data='''R0lGODlhEAAQAKEBA
             AAAAACPAACkIQCPACH5BAEKAAMALAAAAAAQABAAAAI0lDaGmocP45J0uQjo\nhSBXHHg
             T0pVAED7Mibao6ADGPIuP2RlwJdsMZhthPkRVETKzKBuIAgA7
             ''').zoom(64).subsample(16)
 
+        active_light = tk.PhotoImage("img_active_light", data='''R0lGODlhEAAQAOM
+            EAAAAAFVVVQC+AP+RAADhAKqqqgD/APG/AOzkAADhAADhAADhAADhAADhAADh\nAADhA
+            CH5BAEKAA8ALAAAAAAQABAAAARIUIj3JLV10ke2353GUQZhUl3mGZ54bez4fqg8V1yXt
+            jlW\nby4c6DE4CGkpwQGhSf4eAAlg6KMArtNPEBAoZGmfKy0IBmLOGkwEADs=
+            ''').zoom(64).subsample(16)
+
+        inactive_light = tk.PhotoImage("img_inactive_light", data='''R0lGODlhEAA
+            QAMIEAAAAAMMAAFVVVaqqqgDhAADhAADhAADhACH5BAEKAAQALAAAAAAQABAAAAM1\nG
+            EGk7G2xSeuzCk7dqNxgd1ndJ57oGHlsewlCisGmDChAxRFAn+sVgGDwI1F6GCMp85BAI
+            AkAOw==
+            ''').zoom(64).subsample(16)
+
         cls.imgs = {"border": border_tile_data,
                     "active_zone": active_zone,
-                    "inactive_zone": inactive_zone}
+                    "inactive_zone": inactive_zone,
+                    "active_light": active_light,
+                    "inactive_light": inactive_light}
 
 
 class Level:
@@ -1407,7 +1449,7 @@ class Level:
         self.decomap = [[0] * self.level_width for i in range(self.level_height)]
         self.collider = [[0] * (self.level_width * 2) for i in range(self.level_height * 2)]
         self.default_start = [0, 0]
-        self.lightmap = []
+        self.lightmap = LightmapDict()
         self.loading_zones = LoadingZoneDict()
 
     def load_from_json(self, data):
@@ -1418,7 +1460,11 @@ class Level:
         self.loading_zones = LoadingZoneDict()
         for i in data["loading_zones"]:
             self.loading_zones[i["zone"][0], i["zone"][1]] = LoadingZone(i["target_level"], i["target_pos"])
-        self.lightmap = data["lightmap"]
+        for i in data["lightmap"]:
+            red = ColorFade(i["red"]["amplitude"], i["red"]["inner_diameter"], i["red"]["outer_diameter"])
+            green = ColorFade(i["green"]["amplitude"], i["green"]["inner_diameter"], i["green"]["outer_diameter"])
+            blue = ColorFade(i["blue"]["amplitude"], i["blue"]["inner_diameter"], i["blue"]["outer_diameter"])
+            self.lightmap[i["pos"][0], i["pos"][1]] = Light(i["diameter"], red, green, blue, i["blacklight"], True)
         self.default_start = data["spawn"]
         self.name = data["name"]
         self.level_width = len(self.tilemap[0])
@@ -1430,7 +1476,7 @@ class Level:
                            "decomap": self.decomap,
                            "colliders": self.collider,
                            "loading_zones": self.loading_zones.jsonify(),
-                           "lightmap": self.lightmap,
+                           "lightmap": self.lightmap.jsonify(),
                            "spawn": self.default_start,
                            "name": self.name})
 
@@ -1451,11 +1497,62 @@ class LoadingZone:
         return LoadingZone(str(self.target_level), [self.target_pos[0], self.target_pos[1]])
 
 
-class LoadingZoneDict:
-    """Data structure for loading zone lists"""
+class Light:
+    """Data structure for lights"""
 
-    # Structure:
-    # [{"zone":[x, y], "target_level": "Level Name", "target_pos": [x, y]},{}...]
+    def __init__(self, diameter, red, green, blue, blacklight=False, active=False):
+        self.diameter = diameter
+        self.red = red
+        self.green = green
+        self.blue = blue
+        self.blacklight = blacklight
+        self.active = active
+
+    def __repr__(self):
+        """Return a string representation of the light"""
+        return "<Light | size: {}, blacklight: {}, r: {}, g: {}, b: {}>".format(self.diameter,
+                                                                                self.blacklight,
+                                                                                self.red,
+                                                                                self.green,
+                                                                                self.blue)
+
+    def copy(self):
+        """Return a copy of the light"""
+        return Light(float(self.diameter),
+                     self.red.copy(),
+                     self.green.copy(),
+                     self.blue.copy(),
+                     bool(self.blacklight),
+                     bool(self.active))
+
+
+class ColorFade:
+    """Data structure for color fading data present in lights"""
+
+    def __init__(self, amplitude, inner_diameter, outer_diameter):
+        self.amplitude = amplitude
+        self.inner_diameter = inner_diameter
+        self.outer_diameter = outer_diameter
+
+    def __repr__(self):
+        """Return a string representation of the light"""
+        return "<ColorFade | Amplitude: {}, Inner Diameter: {}, Outer Diameter: {}>".format(self.amplitude,
+                                                                                            self.inner_diameter,
+                                                                                            self.outer_diameter)
+
+    def copy(self):
+        """Return a copy of the ColorFade"""
+        return ColorFade(float(self.amplitude), float(self.inner_diameter), float(self.outer_diameter))
+
+    def jsonify(self):
+        """Return a dictionary representation ready for use in a JSON tag"""
+        return {"amplitude": self.amplitude,
+                "inner_diameter": self.inner_diameter,
+                "outer_diameter": self.outer_diameter}
+
+
+class CoordinateDict:
+    """Data structure for dictionaries where the key MUST be a pair of coordinates"""
 
     def __init__(self):
         super().__init__()
@@ -1466,24 +1563,34 @@ class LoadingZoneDict:
 
     def __getitem__(self, key):
         """Obtain the loading zone given by 'key'"""
-        if type(key) == tuple and len(key) == 2 and type(key[0]) == int and type(key[1]) == int:
+        if self.check_key(key):
             return self.data[key]
         else:
-            raise TypeError("Key must be a pair of integers!")
+            raise TypeError("'{}' is not a valid key!".format(key))
 
     def __setitem__(self, key, value):
         """Modify/create the loading zone given by 'key'"""
-        if type(key) == tuple and len(key) == 2 and type(key[0]) == int and type(key[1]) == int:
-            if type(value) == LoadingZone:
+        if self.check_key(key):
+            if self.check_type(value):
                 self.data[key] = value
             else:
-                raise TypeError("Value must be a loading zone!")
+                raise TypeError("'{}' is not a valid value!".format(value))
         else:
-            raise TypeError("Key must be a pair of integers!")
+            raise TypeError("'{}' is not a valid key!".format(key))
 
     def __contains__(self, key):
         """Check if the dictionary contains a loading zones with 'key'"""
         return key in self.data
+
+    @staticmethod
+    def check_key(key):
+        """Check the type of a key to make sure it is compatible.  Override in subclass"""
+        return True
+
+    @staticmethod
+    def check_type(value):
+        """Checks the type of a value to make sure it is compatible.  Override in subclass"""
+        return True
 
     def pop(self, key):
         """Remove the loading zone given by 'key'"""
@@ -1493,12 +1600,67 @@ class LoadingZoneDict:
         return self.data.items()
 
     def jsonify(self):
-        """Convert into a list representation reading for use in a JSON tag"""
+        """Convert into a list representation reading for use in a JSON tag.  Override in subclass"""
+        pass
+
+
+class LoadingZoneDict(CoordinateDict):
+    """Data structure for loading zone lists"""
+
+    # Structure:
+    # [{"zone":[x, y], "target_level": "Level Name", "target_pos": [x, y]},{}...]
+
+    @staticmethod
+    def check_key(key):
+        """Check to ake sure the key is a pair of integers"""
+        return type(key) == tuple and len(key) == 2 and type(key[0]) == int and type(key[1]) == int
+
+    @staticmethod
+    def check_type(value):
+        """Check to make sure the value type is a LoadingZone"""
+        return type(value) == LoadingZone
+
+    def jsonify(self):
+        """Convert into a list representation for use in a JSON tag"""
         result = []
         for i, j in self.data.items():
             result.append({"zone": list(i),
                            "target_level": j.target_level,
                            "target_pos": j.target_pos})
+
+
+class LightmapDict(CoordinateDict):
+    """Data structure for lightmap lists"""
+
+    # Structure:
+    # [{"pos": [X, Y], "diameter": SIZE, "red": {"amplitude": AMP, "inner_diameter": ID,
+    # "outer_diameter": OD}, "blue": {...}, "green": {...}}]
+
+    @staticmethod
+    def check_key(key):
+        """Check if the key is a pair of floats or integers"""
+        if type(key) == tuple and len(key) == 2:
+            if type(key[0]) == int and type(key[1]) == int:
+                return True
+            elif type(key[0]) == float and type(key[1]) == float:
+                return True
+        return False
+
+    @staticmethod
+    def check_type(value):
+        """Check to make sure the value type is a Light"""
+        return type(value) == Light
+
+    def jsonify(self):
+        """Convert into a list representation for use in a JSON tag"""
+        result = []
+        for i, j in self.data.items():
+            result.append({"pos": list(i),
+                           "diameter": j.diameter,
+                           "blacklight": j.blacklight,
+                           "red": j.red.jsonify(),
+                           "green": j.green.jsonify(),
+                           "blue": j.blue.jsonify()})
 
 
 class SelectionPane(tk.Frame):
@@ -1725,14 +1887,17 @@ class App:
 def main():
     root = tk.Tk()
     root.title("World Builder 2")
-    icon = tk.PhotoImage("""R0lGODlhEAAQAKU7ABIaVhIbVxckXhgkXh0rZR0sZSEybCU3ciU4cik9eCxBfS5Fgy9Fgy9GgzFJ
-                                iDRNjTZQkjhUljlUljlUlztXmz1anz1aoJGRkZaWlZaWlpeXl5qbm5ubm5ycnJ+enp+foKCgoKGh
-                                oaKioqOjo6SkpKWlpaampqenp6mpqamqqqqqqqurq6ysrK2tra6urq+vr7Cvr7CxsbKysrS0tLW1
-                                tbq6us/Pz9nZ2dra2uTk5P///1J711J711J711J711J71yH+EUNyZWF0ZWQgd2l0aCBHSU1QACH5
-                                BAEKAD8ALAAAAAAQABAAAAZtwJ9wKPSMiEiiphMyJZEXDAdEWj2Hl8y0lHJdhZnNh6SCzb4/pkn1
-                                mtmuhYToxIrRbrokIeGYoFoyNTl5RAQIDBAWP202hEMDCA0QFUM1OEgCCAuTaAMHDA8UaAEGCqFo
-                                AKWnaKoRaEMOEq9CQQA7
-                                """)
+    icon = tk.PhotoImage("img_icon", data='''R0lGODlhEAAQAKU7ABIaVhIbVxckXhgkXh0rZR0sZSEybCU3ciU4cik9eCxBfS5
+                                             Fgy9Fgy9GgzFJ\niDRNjTZQkjhUljlUljlUlztXmz1anz1aoJGRkZaWlZaWlpeX
+                                             l5qbm5ubm5ycnJ+enp+foKCgoKGh\noaKioqOjo6SkpKWlpaampqenp6mpqamqq
+                                             qqqqqurq6ysrK2tra6urq+vr7Cvr7CxsbKysrS0tLW1\ntbq6us/Pz9nZ2dra2u
+                                             Tk5P///1J711J711J711J711J71yH+EUNyZWF0ZWQgd2l0aCBHSU1QACH5\nBAE
+                                             KAD8ALAAAAAAQABAAAAZtwJ9wKPSMiEiiphMyJZEXDAdEWj2Hl8y0lHJdhZnNh6
+                                             SCzb4/pkn1\nmtmuhYToxIrRbrokIeGYoFoyNTl5RAQIDBAWP202hEMDCA0QFUM
+                                             1OEgCCAuTaAMHDA8UaAEGCqFo\nAKWnaKoRaEMOEq9CQQA7
+                                             ''')
+
+    root.iconphoto(False, icon)
 
     main_app = App(root)
 
