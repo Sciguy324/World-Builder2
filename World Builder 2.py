@@ -1225,16 +1225,16 @@ class TilemapView(tk.Frame):
 
         # Check to make sure tile is actually on the screen.  If not, cancel drawing.
         # Top side catch
-        if event.y / 32 < 0.1:
+        if event.y / 64 < 0.05:
             return
         # Bottom side catch
-        if event.y / 32 > 8.9:
+        if event.y / 64 > 9.55:
             return
         # Left size catch
-        if event.x / 32 < 0.1:
+        if event.x / 64 < 0.05:
             return
         # Right side catch
-        if event.x / 32 > 15.9:
+        if event.x / 64 > 16.55:
             return
 
         # Draw the tile
