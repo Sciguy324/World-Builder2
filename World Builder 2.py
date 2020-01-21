@@ -153,6 +153,7 @@ class NumberSetDialog(DataSetDialog):
 # TODO: Add tile assembly editor dialog
 # TODO: Add pattern editor dialog
 # TODO: Add tilemap row/column editor dialog
+# TODO: Add light editor dialog
 
 
 class CustomButton(ttk.Button):
@@ -1069,7 +1070,6 @@ class TilemapView(tk.Frame):
             self.draw_loading_zones()
         # Draw lightmap layer if enabled
         elif self.master.master.layer.get() == 4:
-            # TODO: Add lightmap layer
             self.draw_lights()
 
         # Redraw the grid if enabled (self.master.master.grid_mode.get()=1)
