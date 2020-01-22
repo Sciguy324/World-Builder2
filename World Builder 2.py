@@ -904,6 +904,7 @@ class TilemapView(tk.Frame):
         self.current_tile = 0
         self.copied_zone = None
         self.copied_zone_coords = None
+        self.copied_light = None
 
         # Declare the tilemap data
         self.level = Level()
@@ -1102,25 +1103,29 @@ class TilemapView(tk.Frame):
             if self.master.master.layer.get() == 0:
                 self.canvas.bind("<ButtonPress-1>", self.draw_tile)
                 self.canvas.bind("<B1-Motion>", self.draw_tile)
-                self.canvas.bind("<ButtonRelease-1>", self._draw_tile_and_grid)
+                # self.canvas.bind("<ButtonRelease-1>", self._draw_tile_and_grid)
+                self.canvas.bind("<ButtonRelease-1>", lambda event: self._draw_with_grid(event, self.draw_tile))
             # Decomap mode
             elif self.master.master.layer.get() == 1:
                 self.canvas.bind("<ButtonPress-1>", self.draw_deco)
                 self.canvas.bind("<B1-Motion>", self.draw_deco)
-                self.canvas.bind("<ButtonRelease-1>", self._draw_deco_and_grid)
+                # self.canvas.bind("<ButtonRelease-1>", self._draw_deco_and_grid)
+                self.canvas.bind("<ButtonRelease-1>", lambda event: self._draw_with_grid(event, self.draw_deco))
             # Collision map mode
             elif self.master.master.layer.get() == 2:
                 self.canvas.bind("<ButtonPress-1>", self.draw_collider)
                 self.canvas.bind("<B1-Motion>", self.draw_collider)
-                self.canvas.bind("<ButtonRelease-1>", self._draw_collider_and_grid)
+                self.canvas.bind("<ButtonRelease-1>", lambda event: self._draw_with_grid(event, self.draw_collider))
             # Loading zone mode
             elif self.master.master.layer.get() == 3:
                 self.canvas.bind("<ButtonPress-1>", self.draw_zone)
                 self.canvas.bind("<B1-Motion>", self.draw_zone)
-                self.canvas.bind("<ButtonRelease-1>", self._draw_zone_and_grid)
+                self.canvas.bind("<ButtonRelease-1>", lambda event: self._draw_with_grid(event, self.draw_zone))
             # Lightmap mode
             elif self.master.master.layer.get() == 4:
-                pass
+                self.canvas.bind("<ButtonPress-1>", self.draw_light)
+                self.canvas.bind("<B1-Motion>", self.draw_light)
+                self.canvas.bind("<ButtonRelease-1>", lambda event: self._draw_with_grid(event, self.draw_light))
             self.canvas.config(cursor="pencil")
         elif value == 1:
             # Movement controls
@@ -1130,24 +1135,9 @@ class TilemapView(tk.Frame):
             self.canvas.bind("<B1-Motion>", self.move)
             self.canvas.config(cursor="fleur")
 
-    def _draw_tile_and_grid(self, event):
+    def _draw_with_grid(self, event, draw_function):
         self.canvas.delete("all")
-        self.draw_tile(event)
-        self.redraw_view()
-
-    def _draw_deco_and_grid(self, event):
-        self.canvas.delete("all")
-        self.draw_deco(event)
-        self.redraw_view()
-
-    def _draw_collider_and_grid(self, event):
-        self.canvas.delete("all")
-        self.draw_collider(event)
-        self.redraw_view()
-
-    def _draw_zone_and_grid(self, event):
-        self.canvas.delete("all")
-        self.draw_zone(event)
+        draw_function(event)
         self.redraw_view()
 
     def set_grid(self):
@@ -1173,27 +1163,38 @@ class TilemapView(tk.Frame):
         self.set_mode(self.master.master.tool_mode.get())
         self.redraw_view()
 
-    def draw_tile(self, event):
-        """Event callback for drawing a tile on the grid"""
-        # Determine the position at which to to draw the tile
+    def event_to_tile(self, event):
+        """Converts mouse events to tiled coordinates"""
         tile_x = int(self.canvas.xview()[0] * self.level.level_width + event.x / 64)
         tile_y = int(self.canvas.yview()[0] * self.level.level_height + event.y / 64)
 
-        border_mode = self.master.master.border_mode.get()
-
-        if not border_mode:
+        if not self.master.master.border_mode.get():
             tile_x += 1
             tile_y += 1
 
-        # Check to make sure tile is actually on the screen.  If not, cancel drawing.
+        return tile_x, tile_y
+
+    @staticmethod
+    def check_bounds(event):
+        """Check if a mouse event was within bounds.  Does not apply for the collider layer due to double resolution"""
         if event.y / 64 < 0.1:
-            return
+            return False
         if event.y / 64 > 8.9:
-            return
+            return False
         if event.x / 64 < 0.1:
-            return
+            return False
         if event.x / 64 > 15.9:
+            return False
+        return True
+
+    def draw_tile(self, event):
+        """Event callback for drawing a tile on the grid"""
+        # Check to make sure tile is actually on the screen.  If not, cancel drawing.
+        if not self.check_bounds(event):
             return
+
+        # Determine the position at which to to draw the tile
+        tile_x, tile_y = self.event_to_tile(event)
 
         # Draw the tile
         self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
@@ -1210,21 +1211,9 @@ class TilemapView(tk.Frame):
         tile_x = int(self.canvas.xview()[0] * self.level.level_width + event.x / 64)
         tile_y = int(self.canvas.yview()[0] * self.level.level_height + event.y / 64)
 
-        border_mode = self.master.master.border_mode.get()
-
-        if not border_mode:
+        if not self.master.master.border_mode.get():
             tile_x += 1
             tile_y += 1
-
-        # Check to make sure tile is actually on the screen.  If not, cancel drawing.
-        if event.y / 64 < 0.1:
-            return
-        if event.y / 64 > 8.9:
-            return
-        if event.x / 64 < 0.1:
-            return
-        if event.x / 64 > 15.9:
-            return
 
         # Draw the tile
         self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
@@ -1279,25 +1268,12 @@ class TilemapView(tk.Frame):
 
     def draw_zone(self, event):
         """Event callback for editing loading zones"""
-        # Determine the position at which to to draw the tile
-        tile_x = int(self.canvas.xview()[0] * self.level.level_width + event.x / 64)
-        tile_y = int(self.canvas.yview()[0] * self.level.level_height + event.y / 64)
-
-        border_mode = self.master.master.border_mode.get()
-
-        if not border_mode:
-            tile_x += 1
-            tile_y += 1
-
         # Check to make sure tile is actually on the screen.  If not, cancel drawing.
-        if event.y / 64 < 0.1:
+        if not self.check_bounds(event):
             return
-        if event.y / 64 > 8.9:
-            return
-        if event.x / 64 < 0.1:
-            return
-        if event.x / 64 > 15.9:
-            return
+
+        # Determine the position at which to to draw the tile
+        tile_x, tile_y = self.event_to_tile(event)
 
         mode = self.master.master.loading_id.get()
         if mode == 0:
@@ -1306,12 +1282,14 @@ class TilemapView(tk.Frame):
                                      image=TilemapEditorWindow.imgs["delete"])
             if (tile_x, tile_y) in self.level.loading_zones:
                 self.level.loading_zones.pop((tile_x, tile_y))
+
         elif mode == 1:
             # Add a new zone
             if (tile_x, tile_y) not in self.level.loading_zones:
                 self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
                                          image=TilemapView.imgs["inactive_zone"])
                 self.level.loading_zones[tile_x, tile_y] = LoadingZone("", [0, 0])
+
         elif mode == 2:
             # Edit an existing zone
             if (tile_x, tile_y) in self.level.loading_zones:
@@ -1325,6 +1303,7 @@ class TilemapView(tk.Frame):
                                                                            int(new_data[0]["Target Y"])]
                     self.level.loading_zones[tile_x, tile_y].target_level = new_data[1]["Target Level"]
             self.redraw_view()
+
         elif mode == 3:
             # Copy the existing zone
             self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
@@ -1332,12 +1311,14 @@ class TilemapView(tk.Frame):
             if (tile_x, tile_y) in self.level.loading_zones:
                 self.copied_zone = self.level.loading_zones[tile_x, tile_y].copy()
                 self.copied_zone_coords = [tile_x, tile_y]
+
         elif mode == 4:
             # Paste the copied zone
             self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
                                      image=TilemapEditorWindow.imgs["paste"])
             if self.copied_zone is not None:
                 self.level.loading_zones[tile_x, tile_y] = self.copied_zone.copy()
+
         elif mode == 5:
             # Extend the copied zone
             self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
@@ -1349,6 +1330,80 @@ class TilemapView(tk.Frame):
                 self.level.loading_zones[tile_x, tile_y] = new_zone
 
         # print("Loading zones:", self.level.loading_zones)
+
+    def draw_light(self, event):
+        """Event callback for drawing a light"""
+        # Check to make sure tile is actually on the screen.  If not, cancel drawing.
+        if not self.check_bounds(event):
+            return
+
+        # Determine the position at which to to draw the tile
+        tile_x, tile_y = self.event_to_tile(event)
+
+        mode = self.master.master.light_id.get()
+
+        if mode == 0:
+            # Delete light
+            self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
+                                     image=TilemapEditorWindow.imgs["delete"])
+            if (tile_x, tile_y) in self.level.lightmap:
+                self.level.lightmap.pop((tile_x, tile_y))
+
+        elif mode == 1:
+            # Add light
+            self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
+                                     image=TilemapEditorWindow.imgs["new_light"])
+            if (tile_x, tile_y) not in self.level.lightmap:
+                red = ColorFade(255, 0, 64)
+                green = ColorFade(255, 0, 64)
+                blue = ColorFade(255, 0, 64)
+                self.level.lightmap[(tile_x, tile_y)] = Light(1, red, green, blue)
+
+        elif mode == 2:
+            # Edit light
+            # TODO: Replace temporary light editor with more complete one
+            if (tile_x, tile_y) in self.level.lightmap:
+                self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
+                                         image=TilemapEditorWindow.imgs["edit_light"])
+                data = self.level.lightmap[tile_x, tile_y]
+                new_data = DataSetDialog(self, [{"Diameter": data.diameter, "Blacklight": data.blacklight},
+                                                {"Red Amp.": data.red.amplitude,
+                                                 "Red ID": data.red.inner_diameter,
+                                                 "Red OD": data.red.outer_diameter},
+                                                {"Green Amp.": data.green.amplitude,
+                                                 "Green ID": data.green.inner_diameter,
+                                                 "Green OD": data.green.outer_diameter},
+                                                {"Blue Amp.": data.blue.amplitude,
+                                                 "Blue ID": data.blue.inner_diameter,
+                                                 "Blue OD": data.blue.outer_diameter}
+                                                ]).result
+                if new_data is not None:
+                    new_light = Light(float(new_data[0]["Diameter"]),
+                                      ColorFade(float(new_data[1]["Red Amp."]), float(new_data[1]["Red ID"]),
+                                                float(new_data[1]["Red OD"])),
+                                      ColorFade(float(new_data[2]["Green Amp."]), float(new_data[2]["Green ID"]),
+                                                float(new_data[2]["Green OD"])),
+                                      ColorFade(float(new_data[3]["Blue Amp."]), float(new_data[3]["Blue ID"]),
+                                                float(new_data[3]["Blue OD"])),
+                                      bool(new_data[0]["Blacklight"]),
+                                      True)
+                    self.level.lightmap[tile_x, tile_y] = new_light
+
+            self.redraw_view()
+
+        elif mode == 3:
+            # Copy light
+            self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
+                                     image=TilemapEditorWindow.imgs["copy"])
+            if (tile_x, tile_y) in self.level.lightmap:
+                self.copied_light = self.level.lightmap[tile_x, tile_y].copy()
+
+        elif mode == 4:
+            # Paste light
+            self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
+                                     image=TilemapEditorWindow.imgs["paste"])
+            if self.copied_light is not None:
+                self.level.lightmap[tile_x, tile_y] = self.copied_light.copy()
 
     def set_start(self, event):
         """Set the starting position for dragging the canvas around"""
@@ -1497,35 +1552,6 @@ class LoadingZone:
         return LoadingZone(str(self.target_level), [self.target_pos[0], self.target_pos[1]])
 
 
-class Light:
-    """Data structure for lights"""
-
-    def __init__(self, diameter, red, green, blue, blacklight=False, active=False):
-        self.diameter = diameter
-        self.red = red
-        self.green = green
-        self.blue = blue
-        self.blacklight = blacklight
-        self.active = active
-
-    def __repr__(self):
-        """Return a string representation of the light"""
-        return "<Light | size: {}, blacklight: {}, r: {}, g: {}, b: {}>".format(self.diameter,
-                                                                                self.blacklight,
-                                                                                self.red,
-                                                                                self.green,
-                                                                                self.blue)
-
-    def copy(self):
-        """Return a copy of the light"""
-        return Light(float(self.diameter),
-                     self.red.copy(),
-                     self.green.copy(),
-                     self.blue.copy(),
-                     bool(self.blacklight),
-                     bool(self.active))
-
-
 class ColorFade:
     """Data structure for color fading data present in lights"""
 
@@ -1550,6 +1576,34 @@ class ColorFade:
                 "inner_diameter": self.inner_diameter,
                 "outer_diameter": self.outer_diameter}
 
+
+class Light:
+    """Data structure for lights"""
+
+    def __init__(self, diameter, red: ColorFade, green: ColorFade, blue: ColorFade, blacklight=False, active=False):
+        self.diameter = diameter
+        self.red = red
+        self.green = green
+        self.blue = blue
+        self.blacklight = blacklight
+        self.active = active
+
+    def __repr__(self):
+        """Return a string representation of the light"""
+        return "<Light | size: {}, blacklight: {}, r: {}, g: {}, b: {}>".format(self.diameter,
+                                                                                self.blacklight,
+                                                                                self.red,
+                                                                                self.green,
+                                                                                self.blue)
+
+    def copy(self):
+        """Return a copy of the light"""
+        return Light(float(self.diameter),
+                     self.red.copy(),
+                     self.green.copy(),
+                     self.blue.copy(),
+                     bool(self.blacklight),
+                     bool(self.active))
 
 class CoordinateDict:
     """Data structure for dictionaries where the key MUST be a pair of coordinates"""
