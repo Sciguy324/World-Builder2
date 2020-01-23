@@ -197,62 +197,17 @@ class LightEditorDialog(Dialog):
         max_diameter_box = tk.Entry(max_diameter_frame, width=3)
         max_diameter_box.grid(row=0, column=1, sticky=tk.E)
 
+        # TODO: Make scrollbar entries more properly aligned
+
         # Add the color fade editing sections
         for i, j in enumerate(["Red", "Green", "Blue"]):
             # Editing section header
             tk.Label(self.frame, text="{} Effect".format(j)).pack(padx=5, pady=5)
-            # frame = tk.Frame(self.frame)
-            # frame.pack(padx=5, pady=5)
 
-            # Add the amplitude scrollbar
-            # tk.Label(frame, text="Amplitude").grid(row=0, column=0, sticky=tk.NW)
-            # amp_scrollbar = tk.Scrollbar(frame, orient=tk.HORIZONTAL, command=None)
-            # amp_scrollbar.grid(row=0, column=1, sticky=tk.NW)
-            # amp_entry_box = tk.Entry(frame, width=3)
-            # amp_entry_box.grid(row=0, column=2, sticky=tk.NW)
+            # Add the amplitude, inner diameter, and outer diameter sliders/entries
             ScrollbarEntry(self.frame, text="Amplitude", command=None).pack()
             ScrollbarEntry(self.frame, text="Inner Diameter", command=None).pack()
             ScrollbarEntry(self.frame, text="Outer Diameter", command=None).pack()
-
-            # # Add the inner diameter scrollbar
-            # tk.Label(frame, text="Inner Diameter").grid(row=1, column=0, sticky=tk.NW)
-            # id_scrollbar = tk.Scrollbar(frame, orient=tk.HORIZONTAL, command=None)
-            # id_scrollbar.grid(row=1, column=1, sticky=tk.NW)
-            # entry_box = tk.Entry(frame, width=3)
-            # entry_box.grid(row=1, column=2, sticky=tk.NW)
-            #
-            # # Add the outer diameter scrollbar
-            # tk.Label(frame, text="Outer Diameter").grid(row=2, column=0, sticky=tk.NW)
-            # od_scrollbar = tk.Scrollbar(frame, orient=tk.HORIZONTAL, command=None)
-            # od_scrollbar.grid(row=2, column=1, sticky=tk.NW)
-            # od_entry_box = tk.Entry(frame, width=3)
-            # od_entry_box.grid(row=2, column=2, sticky=tk.NW)
-
-        # # Red fade editing section
-        # tk.Label(self.frame, text="Red Effect").pack(padx=5, pady=5)
-        # red_frame = tk.Frame(self.frame)
-        # red_frame.pack(padx=5, pady=5)
-        #
-        # # Red amplitude scrollbar
-        # tk.Label(red_frame, text="Amplitude").grid(row=0, column=0, sticky=tk.NW)
-        # red_amp_scrollbar = tk.Scrollbar(red_frame, orient=tk.HORIZONTAL, command=None)
-        # red_amp_scrollbar.grid(row=0, column=1, sticky=tk.NW)
-        # red_amp_box = tk.Entry(red_frame, width=3)
-        # red_amp_box.grid(row=0, column=2, sticky=tk.NW)
-        #
-        # # Red inner diameter scrollbar
-        # tk.Label(red_frame, text="Inner Diameter").grid(row=1, column=0, sticky=tk.NW)
-        # red_id_scrollbar = tk.Scrollbar(red_frame, orient=tk.HORIZONTAL, command=None)
-        # red_id_scrollbar.grid(row=1, column=1, sticky=tk.NW)
-        # red_id_box = tk.Entry(red_frame, width=3)
-        # red_id_box.grid(row=1, column=2, sticky=tk.NW)
-        #
-        # # Red outer diameter scrollbar
-        # tk.Label(red_frame, text="Outer Diameter").grid(row=2, column=0, sticky=tk.NW)
-        # red_od_scrollbar = tk.Scrollbar(red_frame, orient=tk.HORIZONTAL, command=None)
-        # red_od_scrollbar.grid(row=2, column=1, sticky=tk.NW)
-        # red_od_box = tk.Entry(red_frame, width=3)
-        # red_od_box.grid(row=2, column=2, sticky=tk.NW)
 
     def cancel(self, event=None):
         """Function to handle closing the window"""
