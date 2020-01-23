@@ -7,6 +7,19 @@ from os import path
 import json
 
 
+class ScrollbarEntry(tk.Frame):
+    """Class for entries that follow the format Label, Scrollbar, Entry"""
+
+    def __init__(self, parent, text=None, command=None, **kwargs):
+        super().__init__(parent, **kwargs)
+        self.label = tk.Label(self, text=text)
+        self.label.grid(row=0, column=0, sticky=tk.NW)
+        self.scrollbar = tk.Scrollbar(self, orient=tk.HORIZONTAL, command=command)
+        self.scrollbar.grid(row=0, column=1, sticky=tk.NW)
+        self.entry = tk.Entry(self, width=3)
+        self.entry.grid(row=0, column=2, sticky=tk.NW)
+
+
 class Dialog(tk.Toplevel):
     """General class for dialogs"""
 
@@ -41,14 +54,15 @@ class Dialog(tk.Toplevel):
 
     def buttons(self):
         """Add OK and CANCEL buttons.  Override in subclass if unneeded."""
+        # This frame acts independently of self.frame
         frame = tk.Frame(self)
 
         # Create the OK button
-        ok_button = tk.Button(frame, text="OK", width=10, command=self.ok, default=tk.ACTIVE)
+        ok_button = tk.Button(frame, text="Ok", width=10, command=self.ok, default=tk.ACTIVE)
         ok_button.pack(side=tk.LEFT, padx=5, pady=5)
 
         # Create the CANCEL button
-        cancel_button = tk.Button(frame, text="CANCEL", width=10, command=self.cancel)
+        cancel_button = tk.Button(frame, text="Cancel", width=10, command=self.cancel)
         cancel_button.pack(side=tk.LEFT, padx=5, pady=5)
 
         # Bind some shortcuts
@@ -145,6 +159,113 @@ class NumberSetDialog(DataSetDialog):
                 except ValueError:
                     return False
         return True
+
+
+class LightEditorDialog(Dialog):
+    """Dialog for editing lights"""
+    # TODO: Check later if self.canvas needs to be stored as an attribute
+
+    def __init__(self, parent, light_data, **kwargs):
+        self.light_data = light_data.copy()
+        self.canvas = None
+        super().__init__(parent, title="Edit Light", **kwargs)
+
+    def body(self):
+        """Generate the body of the window"""
+        # Create the canvas
+        self.canvas = tk.Canvas(self.frame, width=256, height=256)
+        self.canvas.pack(padx=5, pady=5)
+
+        # Color the canvas
+        self.canvas.create_rectangle((0, 0, 256, 256), fill="black", width=1)
+
+        # Basic properties editing section
+        # Blacklight box
+        blacklight_frame = tk.Frame(self.frame)
+        blacklight_frame.pack(padx=5, pady=5)
+        tk.Label(blacklight_frame, text="Blacklight?").grid(row=0, column=0, sticky=tk.W)
+        blacklight_box = tk.Checkbutton(blacklight_frame, variable=None)
+        blacklight_box.grid(row=0, column=1, sticky=tk.W)
+
+        # Create the maximum diameter scrollbar + box
+        tk.Label(self.frame, text="Maximum Diameter").pack(padx=5, pady=5)
+
+        max_diameter_frame = tk.Frame(self.frame)
+        max_diameter_frame.pack(padx=5, pady=5)
+        max_diameter_scrollbar = tk.Scrollbar(max_diameter_frame, orient=tk.HORIZONTAL, command=None)
+        max_diameter_scrollbar.grid(row=0, column=0, sticky=tk.W)
+        max_diameter_box = tk.Entry(max_diameter_frame, width=3)
+        max_diameter_box.grid(row=0, column=1, sticky=tk.E)
+
+        # Add the color fade editing sections
+        for i, j in enumerate(["Red", "Green", "Blue"]):
+            # Editing section header
+            tk.Label(self.frame, text="{} Effect".format(j)).pack(padx=5, pady=5)
+            # frame = tk.Frame(self.frame)
+            # frame.pack(padx=5, pady=5)
+
+            # Add the amplitude scrollbar
+            # tk.Label(frame, text="Amplitude").grid(row=0, column=0, sticky=tk.NW)
+            # amp_scrollbar = tk.Scrollbar(frame, orient=tk.HORIZONTAL, command=None)
+            # amp_scrollbar.grid(row=0, column=1, sticky=tk.NW)
+            # amp_entry_box = tk.Entry(frame, width=3)
+            # amp_entry_box.grid(row=0, column=2, sticky=tk.NW)
+            ScrollbarEntry(self.frame, text="Amplitude", command=None).pack()
+            ScrollbarEntry(self.frame, text="Inner Diameter", command=None).pack()
+            ScrollbarEntry(self.frame, text="Outer Diameter", command=None).pack()
+
+            # # Add the inner diameter scrollbar
+            # tk.Label(frame, text="Inner Diameter").grid(row=1, column=0, sticky=tk.NW)
+            # id_scrollbar = tk.Scrollbar(frame, orient=tk.HORIZONTAL, command=None)
+            # id_scrollbar.grid(row=1, column=1, sticky=tk.NW)
+            # entry_box = tk.Entry(frame, width=3)
+            # entry_box.grid(row=1, column=2, sticky=tk.NW)
+            #
+            # # Add the outer diameter scrollbar
+            # tk.Label(frame, text="Outer Diameter").grid(row=2, column=0, sticky=tk.NW)
+            # od_scrollbar = tk.Scrollbar(frame, orient=tk.HORIZONTAL, command=None)
+            # od_scrollbar.grid(row=2, column=1, sticky=tk.NW)
+            # od_entry_box = tk.Entry(frame, width=3)
+            # od_entry_box.grid(row=2, column=2, sticky=tk.NW)
+
+        # # Red fade editing section
+        # tk.Label(self.frame, text="Red Effect").pack(padx=5, pady=5)
+        # red_frame = tk.Frame(self.frame)
+        # red_frame.pack(padx=5, pady=5)
+        #
+        # # Red amplitude scrollbar
+        # tk.Label(red_frame, text="Amplitude").grid(row=0, column=0, sticky=tk.NW)
+        # red_amp_scrollbar = tk.Scrollbar(red_frame, orient=tk.HORIZONTAL, command=None)
+        # red_amp_scrollbar.grid(row=0, column=1, sticky=tk.NW)
+        # red_amp_box = tk.Entry(red_frame, width=3)
+        # red_amp_box.grid(row=0, column=2, sticky=tk.NW)
+        #
+        # # Red inner diameter scrollbar
+        # tk.Label(red_frame, text="Inner Diameter").grid(row=1, column=0, sticky=tk.NW)
+        # red_id_scrollbar = tk.Scrollbar(red_frame, orient=tk.HORIZONTAL, command=None)
+        # red_id_scrollbar.grid(row=1, column=1, sticky=tk.NW)
+        # red_id_box = tk.Entry(red_frame, width=3)
+        # red_id_box.grid(row=1, column=2, sticky=tk.NW)
+        #
+        # # Red outer diameter scrollbar
+        # tk.Label(red_frame, text="Outer Diameter").grid(row=2, column=0, sticky=tk.NW)
+        # red_od_scrollbar = tk.Scrollbar(red_frame, orient=tk.HORIZONTAL, command=None)
+        # red_od_scrollbar.grid(row=2, column=1, sticky=tk.NW)
+        # red_od_box = tk.Entry(red_frame, width=3)
+        # red_od_box.grid(row=2, column=2, sticky=tk.NW)
+
+    def cancel(self, event=None):
+        """Function to handle closing the window"""
+        self.parent.focus_set()
+        self.destroy()
+
+    def check(self):
+        """Verify the output"""
+        return 1
+
+    def apply(self):
+        """Return the output by placing it in self.result"""
+        pass
 
 
 # TODO: Add collision geometry editor dialog
@@ -1377,6 +1498,7 @@ class TilemapView(tk.Frame):
                                                  "Blue ID": data.blue.inner_diameter,
                                                  "Blue OD": data.blue.outer_diameter}
                                                 ]).result
+                LightEditorDialog(self, data)
                 if new_data is not None:
                     new_light = Light(float(new_data[0]["Diameter"]),
                                       ColorFade(float(new_data[1]["Red Amp."]), float(new_data[1]["Red ID"]),
@@ -1420,6 +1542,7 @@ class TilemapView(tk.Frame):
 
     def load_from_file(self, file):
         """Loads level data from a .json file"""
+        # TODO: Add function to check if data is formatted correctly
         with open(file, mode="r") as f:
             level_data = json.load(f)
             self.level.load_from_json(level_data)
@@ -1604,6 +1727,7 @@ class Light:
                      self.blue.copy(),
                      bool(self.blacklight),
                      bool(self.active))
+
 
 class CoordinateDict:
     """Data structure for dictionaries where the key MUST be a pair of coordinates"""
