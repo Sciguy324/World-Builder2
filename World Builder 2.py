@@ -12,12 +12,50 @@ class ScrollbarEntry(tk.Frame):
 
     def __init__(self, parent, text=None, command=None, **kwargs):
         super().__init__(parent, **kwargs)
-        self.label = tk.Label(self, text=text)
-        self.label.grid(row=0, column=0, sticky=tk.NW)
-        self.scrollbar = tk.Scrollbar(self, orient=tk.HORIZONTAL, command=command)
-        self.scrollbar.grid(row=0, column=1, sticky=tk.NW)
-        self.entry = tk.Entry(self, width=3)
-        self.entry.grid(row=0, column=2, sticky=tk.NW)
+        # Convert to list format
+        if type(text) != list:
+            # If the text was not given, create a list of 'None' based on commands
+            if text is None:
+                if type(command) == list:
+                    # If command is a list, use its length for self.texts
+                    self.texts = [None] * len(command)
+                else:
+                    # Command was not a list, so just assume its length is '1'
+                    self.texts = [None]
+            else:
+                # If text was not a list and not 'None' assume it must be converted to a list
+                self.texts = [text]
+        else:
+            # text was already a list
+            self.texts = text
+
+        if type(command) != list:
+            if command is None:
+                if type(text) == list:
+                    # If text is a list, use its length for self.commands
+                    self.commands = [None] * len(text)
+                else:
+                    # text was not a list, so just assume its length is '1'
+                    self.commands = [None]
+            else:
+                # If command was not a list and not 'None' assume it must be converted to a list
+                self.commands = [command]
+        else:
+            # command was already a list
+            self.commands = command
+
+        # Check for dimension mismatch
+        if len(self.texts) != len(self.commands):
+            raise ValueError("Length mismatch between text and commands")
+
+        # Add the widgets
+        for i, (j, k) in enumerate(zip(self.texts, self.commands)):
+            self.label = tk.Label(self, text=j)
+            self.label.grid(row=i, column=0, sticky=tk.NW)
+            self.scrollbar = tk.Scrollbar(self, orient=tk.HORIZONTAL, command=k)
+            self.scrollbar.grid(row=i, column=1, sticky=tk.NW)
+            self.entry = tk.Entry(self, width=5)
+            self.entry.grid(row=i, column=2, sticky=tk.NW)
 
 
 class Dialog(tk.Toplevel):
@@ -187,17 +225,8 @@ class LightEditorDialog(Dialog):
         blacklight_box = tk.Checkbutton(blacklight_frame, variable=None)
         blacklight_box.grid(row=0, column=1, sticky=tk.W)
 
-        # Create the maximum diameter scrollbar + box
-        tk.Label(self.frame, text="Maximum Diameter").pack(padx=5, pady=5)
-
-        max_diameter_frame = tk.Frame(self.frame)
-        max_diameter_frame.pack(padx=5, pady=5)
-        max_diameter_scrollbar = tk.Scrollbar(max_diameter_frame, orient=tk.HORIZONTAL, command=None)
-        max_diameter_scrollbar.grid(row=0, column=0, sticky=tk.W)
-        max_diameter_box = tk.Entry(max_diameter_frame, width=3)
-        max_diameter_box.grid(row=0, column=1, sticky=tk.E)
-
-        # TODO: Make scrollbar entries more properly aligned
+        # Create the maximum diameter scrollbar entry
+        ScrollbarEntry(self.frame, text="Maximum Diameter", command=None).pack(padx=5, pady=5)
 
         # Add the color fade editing sections
         for i, j in enumerate(["Red", "Green", "Blue"]):
@@ -205,9 +234,9 @@ class LightEditorDialog(Dialog):
             tk.Label(self.frame, text="{} Effect".format(j)).pack(padx=5, pady=5)
 
             # Add the amplitude, inner diameter, and outer diameter sliders/entries
-            ScrollbarEntry(self.frame, text="Amplitude", command=None).pack()
-            ScrollbarEntry(self.frame, text="Inner Diameter", command=None).pack()
-            ScrollbarEntry(self.frame, text="Outer Diameter", command=None).pack()
+            ScrollbarEntry(self.frame,
+                           text=["Amplitude", "Inner Diameter", "Outer Diameter"],
+                           command=[None, None, None]).pack()
 
     def cancel(self, event=None):
         """Function to handle closing the window"""
