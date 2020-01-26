@@ -10,15 +10,15 @@ import json
 class ScrollbarEntry(tk.Frame):
     """Class for entries that follow the format Label, Scrollbar, Entry"""
 
-    def __init__(self, parent, text=None, command=None, **kwargs):
+    def __init__(self, parent, text=None, value=None, max_value=1024.0, **kwargs):
         super().__init__(parent, **kwargs)
         # Convert to list format
         if type(text) != list:
             # If the text was not given, create a list of 'None' based on commands
             if text is None:
-                if type(command) == list:
+                if type(value) == list:
                     # If command is a list, use its length for self.texts
-                    self.texts = [None] * len(command)
+                    self.texts = [None] * len(value)
                 else:
                     # Command was not a list, so just assume its length is '1'
                     self.texts = [None]
@@ -29,33 +29,62 @@ class ScrollbarEntry(tk.Frame):
             # text was already a list
             self.texts = text
 
-        if type(command) != list:
-            if command is None:
+        if type(value) != list:
+            if value is None:
                 if type(text) == list:
                     # If text is a list, use its length for self.commands
-                    self.commands = [None] * len(text)
+                    self.values = [None] * len(text)
                 else:
                     # text was not a list, so just assume its length is '1'
-                    self.commands = [None]
+                    self.values = [None]
             else:
                 # If command was not a list and not 'None' assume it must be converted to a list
-                self.commands = [command]
+                self.values = [value]
         else:
             # command was already a list
-            self.commands = command
+            self.values = value
 
         # Check for dimension mismatch
-        if len(self.texts) != len(self.commands):
+        if len(self.texts) != len(self.values):
             raise ValueError("Length mismatch between text and commands")
 
+        self.variables = []
+        self.text_variables = []
+        # noinspection PyUnusedLocal
+        for i, j in enumerate(self.values):
+            self.variables.append(tk.DoubleVar(self, j))
+            self.text_variables.append(tk.StringVar(self, str(j)))
+            self.text_variables[i].trace_variable('w', lambda name, index, op, bound_i=i: self.set_variable(bound_i))
+
+        self.labels = []
+        self.scrollbars = []
+        self.entries = []
+        # TODO: Make this editor more usable (Remove sliders?)
         # Add the widgets
-        for i, (j, k) in enumerate(zip(self.texts, self.commands)):
-            self.label = tk.Label(self, text=j)
-            self.label.grid(row=i, column=0, sticky=tk.NW)
-            self.scrollbar = tk.Scrollbar(self, orient=tk.HORIZONTAL, command=k)
-            self.scrollbar.grid(row=i, column=1, sticky=tk.NW)
-            self.entry = tk.Entry(self, width=5)
-            self.entry.grid(row=i, column=2, sticky=tk.NW)
+        for i, (j, k, m, n) in enumerate(zip(self.texts, self.variables, self.values, self.text_variables)):
+            self.labels.append(tk.Label(self, text=j))
+            self.labels[i].grid(row=i, column=0, sticky=tk.NW)
+            self.scrollbars.append(tk.Scale(self, from_=0, to=max_value, showvalue=0, orient=tk.HORIZONTAL, variable=k,
+                                            command=self.raise_event))
+            self.scrollbars[i].grid(row=i, column=1, sticky=tk.NW)
+            self.entries.append(tk.Entry(self, width=6, textvariable=n))
+            self.entries[i].grid(row=i, column=2, sticky=tk.NW)
+
+    def set_variable(self, index):
+        """Event callback for text variables so that the actual variables are up to date"""
+        try:
+            self.variables[index].set(float(self.text_variables[index].get()))
+            self.raise_event()
+        except ValueError:
+            pass
+
+    def raise_event(self, event=None):
+        """Raise an event telling the parent widget that the scrollbars have been used"""
+        for i, j in zip(self.entries, self.variables):
+            i.delete(0, tk.END)
+            i.insert(0, str(j.get()))
+
+        self.event_generate("<<ScrollbarMoved>>")
 
 
 class Dialog(tk.Toplevel):
@@ -201,11 +230,11 @@ class NumberSetDialog(DataSetDialog):
 
 class LightEditorDialog(Dialog):
     """Dialog for editing lights"""
-    # TODO: Check later if self.canvas needs to be stored as an attribute
 
     def __init__(self, parent, light_data, **kwargs):
         self.light_data = light_data.copy()
         self.canvas = None
+
         super().__init__(parent, title="Edit Light", **kwargs)
 
     def body(self):
@@ -226,17 +255,92 @@ class LightEditorDialog(Dialog):
         blacklight_box.grid(row=0, column=1, sticky=tk.W)
 
         # Create the maximum diameter scrollbar entry
-        ScrollbarEntry(self.frame, text="Maximum Diameter", command=None).pack(padx=5, pady=5)
+        self.diameter_slider = ScrollbarEntry(self.frame, text="Maximum Diameter", value=self.light_data.diameter,
+                                              max_value=8)
+        self.diameter_slider.pack(padx=5, pady=5)
 
         # Add the color fade editing sections
-        for i, j in enumerate(["Red", "Green", "Blue"]):
-            # Editing section header
-            tk.Label(self.frame, text="{} Effect".format(j)).pack(padx=5, pady=5)
+        # Editing section header
+        tk.Label(self.frame, text="Red Effect").pack(padx=5, pady=5)
+        # Add the amplitude, inner diameter, and outer diameter sliders/entries
+        self.red_slider = ScrollbarEntry(self.frame,
+                                         text=["Amplitude", "Inner Diameter", "Outer Diameter"],
+                                         value=[self.light_data.red.amplitude,
+                                                self.light_data.red.inner_diameter,
+                                                self.light_data.red.outer_diameter],
+                                         max_value=512.0)
+        self.red_slider.pack()
 
-            # Add the amplitude, inner diameter, and outer diameter sliders/entries
-            ScrollbarEntry(self.frame,
-                           text=["Amplitude", "Inner Diameter", "Outer Diameter"],
-                           command=[None, None, None]).pack()
+        # Editing section header
+        tk.Label(self.frame, text="Green Effect").pack(padx=5, pady=5)
+        # Add the amplitude, inner diameter, and outer diameter sliders/entries
+        self.green_slider = ScrollbarEntry(self.frame,
+                                           text=["Amplitude", "Inner Diameter", "Outer Diameter"],
+                                           value=[self.light_data.green.amplitude,
+                                                  self.light_data.green.inner_diameter,
+                                                  self.light_data.green.outer_diameter],
+                                           max_value=512.0)
+        self.green_slider.pack()
+
+        # Editing section header
+        tk.Label(self.frame, text="Blue Effect").pack(padx=5, pady=5)
+        # Add the amplitude, inner diameter, and outer diameter sliders/entries
+        self.blue_slider = ScrollbarEntry(self.frame,
+                                          text=["Amplitude", "Inner Diameter", "Outer Diameter"],
+                                          value=[self.light_data.blue.amplitude,
+                                                 self.light_data.blue.inner_diameter,
+                                                 self.light_data.blue.outer_diameter],
+                                          max_value=512.0)
+        self.blue_slider.pack()
+
+        # Add the callback for the scrollbars.  TODO: Fix this comment when I'm not tired
+        self.bind("<<ScrollbarMoved>>", self.draw_light)
+        self.draw_light()
+
+    @staticmethod
+    def calc_intensity(color, value):
+        return int(max(min(color.amplitude / (color.inner_diameter - color.outer_diameter) * (value - color.outer_diameter), 255.0), 0.0))
+
+    def draw_light(self, event=None):
+        """Draw a preview of the light in the display canvas"""
+        # Update the light data
+        # TODO: Improve draw speed
+        self.light_data.diameter = self.diameter_slider.variables[0].get()
+
+        self.light_data.red.amplitude = self.red_slider.variables[0].get()
+        self.light_data.red.inner_diameter = self.red_slider.variables[1].get()
+        self.light_data.red.outer_diameter = self.red_slider.variables[2].get()
+
+        self.light_data.green.amplitude = self.green_slider.variables[0].get()
+        self.light_data.green.inner_diameter = self.green_slider.variables[1].get()
+        self.light_data.green.outer_diameter = self.green_slider.variables[2].get()
+
+        self.light_data.blue.amplitude = self.blue_slider.variables[0].get()
+        self.light_data.blue.inner_diameter = self.blue_slider.variables[1].get()
+        self.light_data.blue.outer_diameter = self.blue_slider.variables[2].get()
+
+        # Clear the canvas
+        self.canvas.delete()
+
+        # Construct the light
+        i = 64 * self.light_data.diameter
+        red = self.light_data.red
+        greem = self.light_data.green
+        blue = self.light_data.blue
+        while i >= 0.0:
+            red_intensity = self.calc_intensity(red, i)
+            greem_intensity = self.calc_intensity(greem, i)
+            blue_intensity = self.calc_intensity(blue, i)
+            c = self.light_data.diameter * 64 - i
+            self.canvas.create_oval((c * 2, c * 2, 256 - c * 2, 256 - c * 2),
+                                    fill='#%02x%02x%02x' % (red_intensity, greem_intensity, blue_intensity),
+                                    width=0)
+            i -= 1
+
+    @staticmethod
+    def print_value(self):
+        """Test"""
+        print("ok")
 
     def cancel(self, event=None):
         """Function to handle closing the window"""
@@ -258,7 +362,6 @@ class LightEditorDialog(Dialog):
 # TODO: Add tile assembly editor dialog
 # TODO: Add pattern editor dialog
 # TODO: Add tilemap row/column editor dialog
-# TODO: Add light editor dialog
 
 
 class CustomButton(ttk.Button):
@@ -1471,17 +1574,18 @@ class TilemapView(tk.Frame):
                 self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
                                          image=TilemapEditorWindow.imgs["edit_light"])
                 data = self.level.lightmap[tile_x, tile_y]
-                new_data = DataSetDialog(self, [{"Diameter": data.diameter, "Blacklight": data.blacklight},
-                                                {"Red Amp.": data.red.amplitude,
-                                                 "Red ID": data.red.inner_diameter,
-                                                 "Red OD": data.red.outer_diameter},
-                                                {"Green Amp.": data.green.amplitude,
-                                                 "Green ID": data.green.inner_diameter,
-                                                 "Green OD": data.green.outer_diameter},
-                                                {"Blue Amp.": data.blue.amplitude,
-                                                 "Blue ID": data.blue.inner_diameter,
-                                                 "Blue OD": data.blue.outer_diameter}
-                                                ]).result
+                # new_data = DataSetDialog(self, [{"Diameter": data.diameter, "Blacklight": data.blacklight},
+                #                                 {"Red Amp.": data.red.amplitude,
+                #                                  "Red ID": data.red.inner_diameter,
+                #                                  "Red OD": data.red.outer_diameter},
+                #                                 {"Green Amp.": data.green.amplitude,
+                #                                  "Green ID": data.green.inner_diameter,
+                #                                  "Green OD": data.green.outer_diameter},
+                #                                 {"Blue Amp.": data.blue.amplitude,
+                #                                  "Blue ID": data.blue.inner_diameter,
+                #                                  "Blue OD": data.blue.outer_diameter}
+                #                                 ]).result
+                new_data = None
                 LightEditorDialog(self, data)
                 if new_data is not None:
                     new_light = Light(float(new_data[0]["Diameter"]),
