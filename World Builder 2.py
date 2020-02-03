@@ -74,7 +74,7 @@ class ScrollbarEntry(tk.Frame):
         """Event callback for text variables so that the actual variables are up to date"""
         try:
             self.variables[index].set(float(self.text_variables[index].get()))
-            self.raise_event()
+            self.event_generate("<<ScrollbarMoved>>")
         except ValueError:
             pass
 
@@ -299,12 +299,17 @@ class LightEditorDialog(Dialog):
 
     @staticmethod
     def calc_intensity(color, value):
-        return int(max(min(color.amplitude / (color.inner_diameter - color.outer_diameter) * (value - color.outer_diameter), 255.0), 0.0))
+        try:
+            return int(max(min(color.amplitude /
+                               (color.inner_diameter - color.outer_diameter) * (value - color.outer_diameter),
+                               255.0), 0.0))
+        except ZeroDivisionError:
+            return 255
 
     def draw_light(self, event=None):
         """Draw a preview of the light in the display canvas"""
         # Update the light data
-        # TODO: Improve draw speed
+        # TODO: Add zoom feature for lights larger than the window
         self.light_data.diameter = self.diameter_slider.variables[0].get()
 
         self.light_data.red.amplitude = self.red_slider.variables[0].get()
@@ -320,10 +325,12 @@ class LightEditorDialog(Dialog):
         self.light_data.blue.outer_diameter = self.blue_slider.variables[2].get()
 
         # Clear the canvas
-        self.canvas.delete()
+        self.canvas.delete("all")
+        self.canvas.create_rectangle((0, 0, 256, 256), fill="black", width=1)
 
         # Construct the light
         i = 64 * self.light_data.diameter
+        # i = 64
         red = self.light_data.red
         greem = self.light_data.green
         blue = self.light_data.blue
@@ -331,7 +338,10 @@ class LightEditorDialog(Dialog):
             red_intensity = self.calc_intensity(red, i)
             greem_intensity = self.calc_intensity(greem, i)
             blue_intensity = self.calc_intensity(blue, i)
+            print("RGB: {}, {}, {}".format(red_intensity, greem_intensity, blue_intensity))
+            print('\t#%02x%02x%02x' % (red_intensity, greem_intensity, blue_intensity))
             c = self.light_data.diameter * 64 - i
+            # c = 64 - i
             self.canvas.create_oval((c * 2, c * 2, 256 - c * 2, 256 - c * 2),
                                     fill='#%02x%02x%02x' % (red_intensity, greem_intensity, blue_intensity),
                                     width=0)
