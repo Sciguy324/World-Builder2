@@ -234,6 +234,11 @@ class LightEditorDialog(Dialog):
     def __init__(self, parent, light_data, **kwargs):
         self.light_data = light_data.copy()
         self.canvas = None
+        self.diameter_slider = None
+        self.red_slider = None
+        self.green_slider = None
+        self.blue_slider = None
+        self.shade_color = (100, 100, 100)
 
         super().__init__(parent, title="Edit Light", **kwargs)
 
@@ -293,20 +298,22 @@ class LightEditorDialog(Dialog):
                                           max_value=512.0)
         self.blue_slider.pack()
 
-        # Add the callback for the scrollbars.  TODO: Fix this comment when I'm not tired
-        self.bind("<<ScrollbarMoved>>", self.draw_light)
+        # Add the draw_light callback for the scrollbars
+        self.bind("<<ScrollbarMoved>>", lambda event: self.draw_light())
         self.draw_light()
 
     @staticmethod
     def calc_intensity(color, value):
+        # Note: assumes background is black
         try:
-            return int(max(min(color.amplitude /
-                               (color.inner_diameter - color.outer_diameter) * (value - color.outer_diameter),
-                               255.0), 0.0))
+            n = int(max(min(color.amplitude /
+                            (color.inner_diameter - color.outer_diameter) * (value - color.outer_diameter),
+                            255.0), 0.0))
+            return max(min(n-100, 255), 0)
         except ZeroDivisionError:
             return 255
 
-    def draw_light(self, event=None):
+    def draw_light(self):
         """Draw a preview of the light in the display canvas"""
         # Update the light data
         # TODO: Add zoom feature for lights larger than the window
@@ -326,7 +333,7 @@ class LightEditorDialog(Dialog):
 
         # Clear the canvas
         self.canvas.delete("all")
-        self.canvas.create_rectangle((0, 0, 256, 256), fill="black", width=1)
+        self.canvas.create_rectangle((0, 0, 256, 256), fill="white", width=1)
 
         # Construct the light
         i = 64 * self.light_data.diameter
@@ -338,11 +345,11 @@ class LightEditorDialog(Dialog):
             red_intensity = self.calc_intensity(red, i)
             greem_intensity = self.calc_intensity(greem, i)
             blue_intensity = self.calc_intensity(blue, i)
-            print("RGB: {}, {}, {}".format(red_intensity, greem_intensity, blue_intensity))
-            print('\t#%02x%02x%02x' % (red_intensity, greem_intensity, blue_intensity))
-            c = self.light_data.diameter * 64 - i
-            # c = 64 - i
-            self.canvas.create_oval((c * 2, c * 2, 256 - c * 2, 256 - c * 2),
+            # print("RGB: {}, {}, {}".format(red_intensity, greem_intensity, blue_intensity))
+            # print('\t#%02x%02x%02x' % (red_intensity, greem_intensity, blue_intensity))
+            # c = self.light_data.diameter * 64 - i
+            c = 64 - i
+            self.canvas.create_oval((c * 2, c * 2,  256 - c * 2,  256 - c * 2),
                                     fill='#%02x%02x%02x' % (red_intensity, greem_intensity, blue_intensity),
                                     width=0)
             i -= 1
