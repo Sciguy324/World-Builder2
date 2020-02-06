@@ -59,7 +59,7 @@ class ScrollbarEntry(tk.Frame):
         self.labels = []
         self.scrollbars = []
         self.entries = []
-        # TODO: Make this editor more usable (Remove sliders?)
+
         # Add the widgets
         for i, (j, k, m, n) in enumerate(zip(self.texts, self.variables, self.values, self.text_variables)):
             self.labels.append(tk.Label(self, text=j))
