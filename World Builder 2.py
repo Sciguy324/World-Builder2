@@ -333,7 +333,7 @@ class LightEditorDialog(Dialog):
 
         # Clear the canvas
         self.canvas.delete("all")
-        self.canvas.create_rectangle((0, 0, 256, 256), fill="white", width=1)
+        self.canvas.create_rectangle((0, 0, 256, 256), fill="black", width=1)
 
         # Construct the light
         i = 64 * self.light_data.diameter
@@ -354,23 +354,18 @@ class LightEditorDialog(Dialog):
                                     width=0)
             i -= 1
 
-    @staticmethod
-    def print_value(self):
-        """Test"""
-        print("ok")
-
     def cancel(self, event=None):
         """Function to handle closing the window"""
         self.parent.focus_set()
         self.destroy()
 
     def check(self):
-        """Verify the output"""
+        """Verify the output.  Note: already checked during editing process."""
         return 1
 
     def apply(self):
         """Return the output by placing it in self.result"""
-        pass
+        self.result = self.light_data
 
 
 # TODO: Add collision geometry editor dialog
@@ -1586,34 +1581,12 @@ class TilemapView(tk.Frame):
 
         elif mode == 2:
             # Edit light
-            # TODO: Replace temporary light editor with more complete one
             if (tile_x, tile_y) in self.level.lightmap:
                 self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
                                          image=TilemapEditorWindow.imgs["edit_light"])
-                data = self.level.lightmap[tile_x, tile_y]
-                # new_data = DataSetDialog(self, [{"Diameter": data.diameter, "Blacklight": data.blacklight},
-                #                                 {"Red Amp.": data.red.amplitude,
-                #                                  "Red ID": data.red.inner_diameter,
-                #                                  "Red OD": data.red.outer_diameter},
-                #                                 {"Green Amp.": data.green.amplitude,
-                #                                  "Green ID": data.green.inner_diameter,
-                #                                  "Green OD": data.green.outer_diameter},
-                #                                 {"Blue Amp.": data.blue.amplitude,
-                #                                  "Blue ID": data.blue.inner_diameter,
-                #                                  "Blue OD": data.blue.outer_diameter}
-                #                                 ]).result
-                new_data = None
-                LightEditorDialog(self, data)
-                if new_data is not None:
-                    new_light = Light(float(new_data[0]["Diameter"]),
-                                      ColorFade(float(new_data[1]["Red Amp."]), float(new_data[1]["Red ID"]),
-                                                float(new_data[1]["Red OD"])),
-                                      ColorFade(float(new_data[2]["Green Amp."]), float(new_data[2]["Green ID"]),
-                                                float(new_data[2]["Green OD"])),
-                                      ColorFade(float(new_data[3]["Blue Amp."]), float(new_data[3]["Blue ID"]),
-                                                float(new_data[3]["Blue OD"])),
-                                      bool(new_data[0]["Blacklight"]),
-                                      True)
+                new_light = LightEditorDialog(self, self.level.lightmap[tile_x, tile_y]).result
+                if new_light is not None:
+                    new_light.active = True
                     self.level.lightmap[tile_x, tile_y] = new_light
 
             self.redraw_view()
@@ -1818,11 +1791,11 @@ class Light:
 
     def __repr__(self):
         """Return a string representation of the light"""
-        return "<Light | size: {}, blacklight: {}, r: {}, g: {}, b: {}>".format(self.diameter,
-                                                                                self.blacklight,
-                                                                                self.red,
-                                                                                self.green,
-                                                                                self.blue)
+        return "<Light | size: {}, blacklight: {},\nr: {},\ng: {},\nb: {}>".format(self.diameter,
+                                                                                   self.blacklight,
+                                                                                   self.red,
+                                                                                   self.green,
+                                                                                   self.blue)
 
     def copy(self):
         """Return a copy of the light"""

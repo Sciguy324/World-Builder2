@@ -126,12 +126,12 @@
         "inner_diameter": 16,
         "outer_diameter": 256
       },
-      "blue": {
+      "green": {
         "amplitude": 192,
         "inner_diameter": 16,
         "outer_diameter": 256
       },
-      "green": {
+      "blue": {
         "amplitude": 0,
         "inner_diameter": 16,
         "outer_diameter": 256
