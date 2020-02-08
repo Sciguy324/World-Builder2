@@ -649,7 +649,8 @@ class TilemapEditorWindow(tk.Frame):
                                      borderwidth=1, relief=tk.SUNKEN, padx=5, pady=5)
         self.level_coords.grid(row=0, column=13, sticky=tk.W)
 
-        # Set up keybindings
+        # TODO: limit the scope of these keybindings
+        # Set up tool keybindings
         parent.master.bind("<Key-1>", self.keybind_draw_mode)
         parent.master.bind("<Key-2>", self.keybind_move_mode)
         parent.master.bind("<Key-3>", self.keybind_grid_mode)
@@ -658,6 +659,12 @@ class TilemapEditorWindow(tk.Frame):
         # Set up the layer keybindings
         for i in range(5, 10):
             parent.master.bind("<Key-{}>".format(i), self.keybind_layer_mode)
+
+        # Set up menubar keybindings
+        parent.master.bind("<Control-o>", self._open_map)
+        parent.master.bind("<Control-s>", self._save_map)
+        parent.master.bind("<Control-S>", self._save_map_as)
+        parent.master.bind("<Control-n>", self.new_view)
 
         # Set up level viewing section
         self.tilemap_panel = CustomNotebook(self)
@@ -730,6 +737,8 @@ class TilemapEditorWindow(tk.Frame):
     def _open_map(self, event=None):
         """Event callback for opening a level"""
         file = filedialog.askopenfilename(filetypes=[("Json", "*.json")], defaultextension=[("Json", "*.json")])
+        if file == "" or file is None:
+            return
         self.open_map(file)
 
     def open_map(self, file):
