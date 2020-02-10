@@ -649,7 +649,7 @@ class TilemapEditorWindow(tk.Frame):
                                      borderwidth=1, relief=tk.SUNKEN, padx=5, pady=5)
         self.level_coords.grid(row=0, column=13, sticky=tk.W)
 
-        # TODO: limit the scope of these keybindings
+        # TODO: Find a more efficient way of limiting the scope of these keybindings
         # Set up tool keybindings
         parent.master.bind("<Key-1>", self.keybind_draw_mode)
         parent.master.bind("<Key-2>", self.keybind_move_mode)
@@ -665,6 +665,7 @@ class TilemapEditorWindow(tk.Frame):
         parent.master.bind("<Control-s>", self._save_map)
         parent.master.bind("<Control-S>", self._save_map_as)
         parent.master.bind("<Control-n>", self.new_view)
+        parent.master.bind("<Control-w>", self._close_view)
 
         # Set up level viewing section
         self.tilemap_panel = CustomNotebook(self)
@@ -695,6 +696,7 @@ class TilemapEditorWindow(tk.Frame):
         self.filemenu.add_command(label="Save Map (Ctrl-S)", command=self._save_map)
         self.filemenu.add_command(label="Save Map As (Ctrl-Shift-S)", command=self._save_map_as)
         self.filemenu.add_command(label="New Map (Ctrl-N)", command=self.new_view)
+        self.filemenu.add_command(label="Close Map (Ctrl-W)", command=self._close_view)
         self.filemenu.add_separator()
         self.filemenu.add_command(label="Settings", command=self.unimplemented)
         self.menubar.add_cascade(label="File", menu=self.filemenu)
@@ -736,6 +738,8 @@ class TilemapEditorWindow(tk.Frame):
 
     def _open_map(self, event=None):
         """Event callback for opening a level"""
+        if self.master.index("current") != 0:
+            return
         file = filedialog.askopenfilename(filetypes=[("Json", "*.json")], defaultextension=[("Json", "*.json")])
         if file == "" or file is None:
             return
@@ -748,10 +752,14 @@ class TilemapEditorWindow(tk.Frame):
 
     def _save_map(self, event=None):
         """Event callback for saving a level"""
+        if self.master.index("current") != 0:
+            return
         self.view_list[self.tilemap_panel.index("current")].quick_save()
 
     def _save_map_as(self, event=None):
         """Event callback for save a level as a new file"""
+        if self.master.index("current") != 0:
+            return
         self.view_list[self.tilemap_panel.index("current")].save_to_file(None)
 
     def _edit_default_spawn(self, event=None):
@@ -763,6 +771,8 @@ class TilemapEditorWindow(tk.Frame):
 
     def new_view(self, event=None):
         """Create a new, blank view"""
+        if self.master.index("current") != 0:
+            return
         # Create new view instance
         self.view_list.append(TilemapView(self.tilemap_panel))
         self.tilemap_panel.select(self.tilemap_panel.index("end") - 1)
@@ -771,13 +781,25 @@ class TilemapEditorWindow(tk.Frame):
         for i in self.view_list:
             i.redraw_view()
 
+    def _close_view(self, event=None):
+        # TODO: Make the close_view process a bit more sane
+        """Event callback for closing the currently open view"""
+        if self.master.index("current") != 0:
+            return
+        self.close_view(self.tilemap_panel.index("current"))
+
     def close_view(self, event):
         """Close the currently open view"""
         # Index of view in question passed as x-coordinate of event
         # Check with the view if it wants to close
-        if self.view_list[event.x].close():
-            self.tilemap_panel.forget(event.x)
-            del self.view_list[event.x]
+        if type(event) == int:
+            if self.view_list[event].close():
+                self.tilemap_panel.forget(event)
+                del self.view_list[event]
+        else:
+            if self.view_list[event.x].close():
+                self.tilemap_panel.forget(event.x)
+                del self.view_list[event.x]
 
     @staticmethod
     def unimplemented(self, event=None):
