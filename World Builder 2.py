@@ -234,6 +234,7 @@ class LightEditorDialog(Dialog):
     def __init__(self, parent, light_data, **kwargs):
         self.light_data = light_data.copy()
         self.canvas = None
+        self.blacklight_state = None
         self.diameter_slider = None
         self.red_slider = None
         self.green_slider = None
@@ -252,11 +253,15 @@ class LightEditorDialog(Dialog):
         self.canvas.create_rectangle((0, 0, 256, 256), fill="black", width=1)
 
         # Basic properties editing section
+        # Blacklight tracking variable
+        self.blacklight_state = tk.BooleanVar(self, False)
+        self.blacklight_state.trace_variable('w', lambda name, index, op: self.event_generate("<<ScrollbarMoved>>"))
+
         # Blacklight box
         blacklight_frame = tk.Frame(self.frame)
         blacklight_frame.pack(padx=5, pady=5)
         tk.Label(blacklight_frame, text="Blacklight?").grid(row=0, column=0, sticky=tk.W)
-        blacklight_box = tk.Checkbutton(blacklight_frame, variable=None)
+        blacklight_box = tk.Checkbutton(blacklight_frame, variable=self.blacklight_state)
         blacklight_box.grid(row=0, column=1, sticky=tk.W)
 
         # Create the maximum diameter scrollbar entry
@@ -303,13 +308,16 @@ class LightEditorDialog(Dialog):
         self.draw_light()
 
     @staticmethod
-    def calc_intensity(color, value):
+    def calc_intensity(color, value, blacklight=False):
         # Note: assumes background is black
         try:
             n = int(max(min(color.amplitude /
                             (color.inner_diameter - color.outer_diameter) * (value - color.outer_diameter),
                             255.0), 0.0))
-            return max(min(n-100, 255), 0)
+            if blacklight:
+                return max(min(155-n, 255), 0)
+            else:
+                return max(min(n-100, 255), 0)
         except ZeroDivisionError:
             return 255
 
@@ -317,6 +325,7 @@ class LightEditorDialog(Dialog):
         """Draw a preview of the light in the display canvas"""
         # Update the light data
         # TODO: Add zoom feature for lights larger than the window
+        self.light_data.blacklight = self.blacklight_state.get()
         self.light_data.diameter = self.diameter_slider.variables[0].get()
 
         self.light_data.red.amplitude = self.red_slider.variables[0].get()
@@ -333,18 +342,22 @@ class LightEditorDialog(Dialog):
 
         # Clear the canvas
         self.canvas.delete("all")
-        self.canvas.create_rectangle((0, 0, 256, 256), fill="black", width=1)
+        if self.light_data.blacklight:
+            self.canvas.create_rectangle((0, 0, 256, 256), fill='#%02x%02x%02x' % (155, 155, 155), width=0)
+        else:
+            self.canvas.create_rectangle((0, 0, 256, 256), fill="black", width=1)
 
         # Construct the light
         i = 64 * self.light_data.diameter
+        blacklight = self.light_data.blacklight
         # i = 64
         red = self.light_data.red
         greem = self.light_data.green
         blue = self.light_data.blue
         while i >= 0.0:
-            red_intensity = self.calc_intensity(red, i)
-            greem_intensity = self.calc_intensity(greem, i)
-            blue_intensity = self.calc_intensity(blue, i)
+            red_intensity = self.calc_intensity(red, i, blacklight)
+            greem_intensity = self.calc_intensity(greem, i, blacklight)
+            blue_intensity = self.calc_intensity(blue, i, blacklight)
             # print("RGB: {}, {}, {}".format(red_intensity, greem_intensity, blue_intensity))
             # print('\t#%02x%02x%02x' % (red_intensity, greem_intensity, blue_intensity))
             # c = self.light_data.diameter * 64 - i
