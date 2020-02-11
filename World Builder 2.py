@@ -1416,10 +1416,12 @@ class TilemapView(tk.Frame):
 
     def event_to_tile(self, event):
         """Converts mouse events to tiled coordinates"""
-        tile_x = int(self.canvas.xview()[0] * self.level.level_width + event.x / 64)
-        tile_y = int(self.canvas.yview()[0] * self.level.level_height + event.y / 64)
-
-        if not self.master.master.border_mode.get():
+        if self.master.master.border_mode.get():
+            tile_x = int(self.canvas.xview()[0] * self.level.level_width + event.x / 64)
+            tile_y = int(self.canvas.yview()[0] * self.level.level_height + event.y / 64)
+        else:
+            tile_x = int(self.canvas.xview()[0] * (self.level.level_width - 2) + event.x / 64)
+            tile_y = int(self.canvas.yview()[0] * (self.level.level_height - 2) + event.y / 64)
             tile_x += 1
             tile_y += 1
 
@@ -1458,13 +1460,10 @@ class TilemapView(tk.Frame):
 
     def draw_deco(self, event):
         """Draw either a tile or a deco on the grid, depending on the arguments"""
-        # Determine the position at which to to draw the tile
-        tile_x = int(self.canvas.xview()[0] * self.level.level_width + event.x / 64)
-        tile_y = int(self.canvas.yview()[0] * self.level.level_height + event.y / 64)
+        if not self.check_bounds(event):
+            return
 
-        if not self.master.master.border_mode.get():
-            tile_x += 1
-            tile_y += 1
+        tile_x, tile_y = self.event_to_tile(event)
 
         # Draw the tile
         self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
@@ -1477,19 +1476,17 @@ class TilemapView(tk.Frame):
 
     def draw_collider(self, event):
         """Event callback for drawing a tile on the grid"""
-        border = self.master.master.border_mode.get()
 
-        if not border:
-            event.x += 32
-            event.y += 32
-
-        # Determine the position at which to to draw the tile
-        tile_x = int(self.canvas.xview()[0] * len(self.level.collider[0]) + event.x / 32)
-        tile_y = int(self.canvas.yview()[0] * len(self.level.collider) + event.y / 32)
-
-        if not border:
+        if self.master.master.border_mode.get():
+            tile_x = int(self.canvas.xview()[0] * len(self.level.collider[0]) + event.x / 32)
+            tile_y = int(self.canvas.yview()[0] * len(self.level.collider) + event.y / 32)
+        else:
+            tile_x = int(self.canvas.xview()[0] * (len(self.level.collider[0])-4) + event.x / 32)
+            tile_y = int(self.canvas.yview()[0] * (len(self.level.collider)-4) + event.y / 32)
             tile_x += 1
             tile_y += 1
+
+        print(tile_x, tile_y)
 
         # Check to make sure tile is actually on the screen.  If not, cancel drawing.
         # Top side catch
