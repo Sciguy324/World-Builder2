@@ -1164,7 +1164,7 @@ class TilemapView(tk.Frame):
         # Declare some variables for view settings
         self.start_x = 0
         self.start_y = 0
-        self.saved = False
+        self.saved = True
         self.current_tile = 0
         self.copied_zone = None
         self.copied_zone_coords = None
@@ -1459,6 +1459,10 @@ class TilemapView(tk.Frame):
         if not self.check_bounds(event):
             return
 
+        # No longer saved
+        self.saved = False
+        self.update_title()
+
         # Determine the position at which to to draw the tile
         tile_x, tile_y = self.event_to_tile(event)
 
@@ -1475,6 +1479,10 @@ class TilemapView(tk.Frame):
         """Draw either a tile or a deco on the grid, depending on the arguments"""
         if not self.check_bounds(event):
             return
+
+        # No longer saved
+        self.saved = False
+        self.update_title()
 
         tile_x, tile_y = self.event_to_tile(event)
 
@@ -1499,8 +1507,6 @@ class TilemapView(tk.Frame):
             tile_x += 1
             tile_y += 1
 
-        print(tile_x, tile_y)
-
         # Check to make sure tile is actually on the screen.  If not, cancel drawing.
         # Top side catch
         if event.y / 64 < 0.05:
@@ -1514,6 +1520,10 @@ class TilemapView(tk.Frame):
         # Right side catch
         if event.x / 64 > 16.55:
             return
+
+        # No longer saved
+        self.saved = False
+        self.update_title()
 
         # Draw the tile
         self.canvas.create_rectangle((tile_x * 32, tile_y * 32, tile_x * 32 + 32, tile_y * 32 + 32),
@@ -1532,6 +1542,10 @@ class TilemapView(tk.Frame):
         # Check to make sure tile is actually on the screen.  If not, cancel drawing.
         if not self.check_bounds(event):
             return
+
+        # No longer saved
+        self.saved = False
+        self.update_title()
 
         # Determine the position at which to to draw the tile
         tile_x, tile_y = self.event_to_tile(event)
@@ -1597,6 +1611,10 @@ class TilemapView(tk.Frame):
         # Check to make sure tile is actually on the screen.  If not, cancel drawing.
         if not self.check_bounds(event):
             return
+
+        # No longer saved
+        self.saved = False
+        self.update_title()
 
         # Determine the position at which to to draw the tile
         tile_x, tile_y = self.event_to_tile(event)

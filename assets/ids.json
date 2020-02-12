@@ -446,162 +446,194 @@
     {
       "id": 0,
       "tex": "box.png",
-      "height": 1
+      "height": 1,
+	  "geo": [0, 0, 0, 0]
     },
     {
       "id": 1,
       "tex": "lamp_post_top.png",
-      "height": 2
+      "height": 2,
+	  "geo": [0, 0, 0, 0]
     },
     {
       "id": 2,
       "tex": "table_top_left.png",
-      "height": 1
+      "height": 1,
+	  "geo": [0, 0, 0, 0]
     },
     {
       "id": 3,
       "tex": "table_top.png",
-      "height": 1
+      "height": 1,
+	  "geo": [0, 0, 0, 0]
     },
     {
       "id": 4,
       "tex": "table_top_right.png",
-      "height": 1
+      "height": 1,
+	  "geo": [0, 0, 0, 0]
     },
     {
       "id": 5,
       "tex": "roof_right_bottom.png",
-      "height": 1
+      "height": 1,
+	  "geo": [0, 0, 0, 0]
     },
     {
       "id": 6,
       "tex": "roof_right_middle1.png",
-      "height": 1
+      "height": 1,
+	  "geo": [0, 0, 0, 0]
     },
     {
       "id": 7,
       "tex": "roof_right_middle2.png",
-      "height": 1
+      "height": 1,
+	  "geo": [0, 0, 0, 0]
     },
     {
       "id": 8,
       "tex": "roof_right_top.png",
-      "height": 1
+      "height": 1,
+	  "geo": [0, 0, 0, 0]
     },
     {
       "id": 9,
       "tex": "roof_left_bottom.png",
-      "height": 1
+      "height": 1,
+	  "geo": [0, 0, 0, 0]
     },
     {
       "id": 10,
       "tex": "roof_left_middle1.png",
-      "height": 1
+      "height": 1,
+	  "geo": [0, 0, 0, 0]
     },
     {
       "id": 11,
       "tex": "roof_left_middle2.png",
-      "height": 1
+      "height": 1,
+	  "geo": [0, 0, 0, 0]
     },
     {
       "id": 12,
       "tex": "roof_left_top.png",
-      "height": 1
+      "height": 1,
+	  "geo": [0, 0, 0, 0]
     },
     {
       "id": 13,
       "tex": "roof_top1.png",
-      "height": 1
+      "height": 1,
+	  "geo": [0, 0, 0, 0]
     },
     {
       "id": 14,
       "tex": "roof_top2.png",
-      "height": 1
+      "height": 1,
+	  "geo": [0, 0, 0, 0]
     },
     {
       "id": 15,
       "tex": "top_roof_shadow.png",
-      "height": 1
+      "height": 1,
+	  "geo": [0, 0, 0, 0]
     },
     {
       "id": 16,
       "tex": "pink_wall_top.png",
-      "height": 1
+      "height": 1,
+	  "geo": [0, 0, 0, 0]
     },
     {
       "id": 17,
       "tex": "white_green_wall_top_rimmed.png",
-      "height": 1
+      "height": 1,
+	  "geo": [0, 0, 0, 0]
     },
     {
       "id": 18,
       "tex": "white_green_wall_painting_top.png",
-      "height": 1
+      "height": 1,
+	  "geo": [0, 0, 0, 0]
     },
     {
       "id": 19,
       "tex": "white_green_wall_clock.png",
-      "height": 1
+      "height": 1,
+	  "geo": [0, 0, 0, 0]
     },
     {
       "id": 20,
       "tex": "lamp.png",
-      "height": 1
+      "height": 1,
+	  "geo": [0, 0, 0, 0]
     },
     {
       "id": 21,
       "tex": "white_green_wall_top_left.png",
-      "height": 1
+      "height": 1,
+	  "geo": [0, 0, 0, 0]
     },
     {
       "id": 22,
       "tex": "white_green_wall_top.png",
-      "height": 1
+      "height": 1,
+	  "geo": [0, 0, 0, 0]
     },
     {
       "id": 23,
       "tex": "white_green_wall_top_right.png",
-      "height": 1
+      "height": 1,
+	  "geo": [0, 0, 0, 0]
     },
     {
       "id": 24,
       "tex": "roof_right_edge.png",
-      "height": 4
+      "height": 4,
+	  "geo": [0, 0, 0, 0]
     },
     {
       "id": 25,
       "tex": "roof_left_edge.png",
-      "height": 4
+      "height": 4,
+	  "geo": [0, 0, 0, 0]
     },
     {
       "id": 26,
       "tex": "tree_top_left.png",
-      "height": 3
+      "height": 3,
+	  "geo": [0, 0, 0, 0]
     },
     {
       "id": 27,
       "tex": "tree_top.png",
-      "height": 3
+      "height": 3,
+	  "geo": [0, 0, 0, 0]
     },
     {
       "id": 29,
       "tex": "tree_mid_left.png",
-      "height": 2
+      "height": 2,
+	  "geo": [0, 0, 0, 0]
     },
     {
       "id": 28,
       "tex": "tree_top_right.png",
-      "height": 3
+      "height": 3,
+	  "geo": [0, 0, 0, 0]
     },
     {
       "id": 30,
       "tex": "tree_mid.png",
-      "height": 2
+      "height": 2,
+	  "geo": [0, 0, 0, 0]
     },
     {
       "id": 31,
       "tex": "tree_mid_right.png",
-      "height": 2
+      "height": 2,
+	  "geo": [0, 0, 0, 0]
     }
 
   ],
