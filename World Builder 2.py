@@ -555,6 +555,7 @@ class TilemapEditorWindow(tk.Frame):
     imgs = {}
     tile_dict = {}
     deco_dict = {}
+    collider_dict = {}
     loading_dict = {}
     light_dict = {}
     __initialized = False
@@ -573,6 +574,7 @@ class TilemapEditorWindow(tk.Frame):
         # Create the master lookup dictionary of the available panes, and add the subcategories
         self.panes = {"tile": {},
                       "deco": {},
+                      "collision": {},
                       "loading": {},
                       "light": {}}
 
@@ -600,11 +602,16 @@ class TilemapEditorWindow(tk.Frame):
         self.deco_id = tk.IntVar(self, 0, "selected_deco")
         self.deco_id.trace("w", self.deco_id_callback)
 
+        # TODO: Remove all of these something_id_callback functions
         # Add the deco ID tracking variable
+        self.collision_id = tk.IntVar(self, 0, "selected_collision")
+        self.collision_id.trace("w", self.deco_id_callback)
+
+        # Add the loading ID tracking variable
         self.loading_id = tk.IntVar(self, 0, "selected_loading")
         self.loading_id.trace("w", self.deco_id_callback)
 
-        # Add the deco ID tracking variable
+        # Add the light ID tracking variable
         self.light_id = tk.IntVar(self, 0, "selected_light")
         self.light_id.trace("w", self.deco_id_callback)
 
@@ -891,6 +898,9 @@ class TilemapEditorWindow(tk.Frame):
         # Decomap mode: select pane from the deco panes
         elif layer == 1:
             self.panes["deco"][pane].pack(anchor="ne")
+        # Collision mode: select the collision pane
+        elif layer == 2:
+            self.panes["collision"][pane].pack(anchor="ne")
         # Loading zone mode: select the loading zone pane
         elif layer == 3:
             self.panes["loading"][pane].pack(anchor="ne")
@@ -936,6 +946,13 @@ class TilemapEditorWindow(tk.Frame):
                                                     self.deco_id,
                                                     borderwidth=1,
                                                     relief=tk.SUNKEN)}
+
+        self.panes["collision"] = {"All": TileCollection(self.selection_frame,
+                                                         [0, 1],
+                                                         "collision",
+                                                         self.collision_id,
+                                                         borderwidth=1,
+                                                         relief=tk.SUNKEN)}
 
         self.panes["loading"] = {"All": TileCollection(self.selection_frame,
                                                        [0, 1, 2, 3, 4, 5],
@@ -1041,6 +1058,16 @@ class TilemapEditorWindow(tk.Frame):
             b7PBwQsCenJtjnxxGI51d1+Nf4CIlQAAA7
             '''
 
+        solidify_data = '''R0lGODlhEAAQAMIFAACJAACNAADNAAD9AAD/AP///////////yH5B
+            AEKAAcALAAAAAAQABAAAAMm\nSLPcPiLKOQGkOIab6e7YB07iqHFmmaKj2rKgG8OdXBN
+            Bru87kAAAOw==
+            '''
+
+        desolidify_data = '''R0lGODlhEAAQAKEDAKc+PtUyMv9DQ////yH5BAEKAAMALAAAAAA
+            QABAAAAI7lC+DeuE+XohQSArf\nADbrz3kipUzXN3GY6UXDipFTOWYvHdu3lZv3m0C5f
+            i/hjNiREXes4VKxAWyetwIAOw==
+            '''
+
         delete_zone = '''R0lGODlhEAAQAKEBAAAAAP8AAP9UVP8AACH5BAEKAAMALAAAAAAQABA
             AAAI5TDaGmocP40IASGoV\nCDbu7nyQKJFk4nFn4wlCBzkP4MLX8K0yzlH9Evr5YIfVc
             GRDom4Sg4MBdRQAADs=
@@ -1092,6 +1119,8 @@ class TilemapEditorWindow(tk.Frame):
                     "loading_layer": tk.PhotoImage("img_load_layer", data=loading_layer_data),
                     "light_layer": tk.PhotoImage("img_light_layer", data=light_layer_data),
                     "delete": tk.PhotoImage("img_delete", data=delete_zone).zoom(64).subsample(16),
+                    "solidify": tk.PhotoImage("img_solidify", data=solidify_data).zoom(64).subsample(16),
+                    "desolidify": tk.PhotoImage("img_desolidify", data=desolidify_data).zoom(64).subsample(16),
                     "new_zone": tk.PhotoImage("img_new_zone", data=new_zone).zoom(64).subsample(16),
                     "configure_zone": tk.PhotoImage("img_edit_zone", data=configure_zone).zoom(64).subsample(16),
                     "copy": tk.PhotoImage("img_copy", data=copy_zone).zoom(64).subsample(16),
@@ -1101,12 +1130,16 @@ class TilemapEditorWindow(tk.Frame):
                     "edit_light": tk.PhotoImage("img_edit_light", data=edit_light).zoom(64).subsample(16)
                     }
 
+        cls.collider_dict = [cls.imgs["desolidify"],
+                             cls.imgs["solidify"]
+                             ]
+
         cls.loading_dict = [cls.imgs["delete"],
                             cls.imgs["new_zone"],
                             cls.imgs["configure_zone"],
                             cls.imgs["copy"],
                             cls.imgs["paste"],
-                            cls.imgs["extend_zone"],
+                            cls.imgs["extend_zone"]
                             ]
 
         cls.light_dict = [cls.imgs["delete"],
@@ -1525,15 +1558,23 @@ class TilemapView(tk.Frame):
         self.saved = False
         self.update_title()
 
+        solid_state = int(self.master.master.collision_id.get())
+
         # Draw the collider
-        self.canvas.create_rectangle((tile_x * 32, tile_y * 32, tile_x * 32 + 32, tile_y * 32 + 32),
-                                     fill="gray",
-                                     width=1,
-                                     stipple="gray50")
+        if solid_state:
+            self.canvas.create_rectangle((tile_x * 32, tile_y * 32, tile_x * 32 + 32, tile_y * 32 + 32),
+                                         fill="green",
+                                         width=1,
+                                         stipple="gray50")
+        else:
+            self.canvas.create_rectangle((tile_x * 32, tile_y * 32, tile_x * 32 + 32, tile_y * 32 + 32),
+                                         fill="red",
+                                         width=1,
+                                         stipple="gray50")
 
         # Add the collider to the collider matrix
         try:
-            self.level.collider[tile_y][tile_x] = 1
+            self.level.collider[tile_y][tile_x] = solid_state
         except IndexError:
             pass
 
@@ -2062,6 +2103,7 @@ class TileCollection(TilePane):
                 self.current_y += 1
                 self.current_x = 0
             # If mode = "tile" load from tileset.  If mode = "deco" load from decoset
+            # TODO: Condense these radiobutton cases
             if mode == "tile":
                 radiobutton = tk.Radiobutton(self.canvas,
                                              indicator=0,
@@ -2074,6 +2116,12 @@ class TileCollection(TilePane):
                                              value=i,
                                              variable=var,
                                              image=TilemapEditorWindow.deco_dict[i])
+            elif mode == "collision":
+                radiobutton = tk.Radiobutton(self.canvas,
+                                             indicator=0,
+                                             value=i,
+                                             variable=var,
+                                             image=TilemapEditorWindow.collider_dict[i])
             elif mode == "loading":
                 radiobutton = tk.Radiobutton(self.canvas,
                                              indicator=0,
@@ -2088,7 +2136,7 @@ class TileCollection(TilePane):
                                              image=TilemapEditorWindow.light_dict[i])
             else:
                 raise ValueError("Cannot initialize TileCollection with unknown mode '{}'."
-                                 "  Options are 'tile' and 'deco'".format(mode))
+                                 "  Options are 'tile,' 'deco,' 'collision,' 'loading' and 'light'".format(mode))
 
             # Configure new radiobutton
             self.canvas.create_window(self.current_x * 72 + 36, self.current_y * 72 + 36, window=radiobutton)
