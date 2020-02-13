@@ -1787,8 +1787,8 @@ class TilemapView(tk.Frame):
         """Saves the level data to a .json file"""
         # TODO: Test if saved files are actually loadable in engine.
         # Save the ids_data to ids.json
-        with open("ids.json", mode="w") as f:
-            f.write(json.dump(f, TilemapEditorWindow.ids_data))
+        with open("assets/ids.json", mode="w") as f:
+            json.dump(TilemapEditorWindow.ids_data, f)
 
         # No file path has been set
         if file is None:
