@@ -50,9 +50,9 @@ Core Feature Elaboration:
 
 		--Border:
 			-The border is a region, marked by warning tape, that the player cannot see
-			-This allows for placing loading zones just outside the map, rather than awkwardly just before
+			--This allows for placing loading zones just outside the map, rather than awkwardly just before
 			X-The tiles here can be configured between solid and non-solid
-			-The border's visibility in the editor can be toggled using a button
+			--The border's visibility in the editor can be toggled using a button
 
 		-Quality of life tools:
 			-Undo/redo buttons and keyboard shortcuts

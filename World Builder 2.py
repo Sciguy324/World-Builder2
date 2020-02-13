@@ -1496,16 +1496,16 @@ class TilemapView(tk.Frame):
             pass
 
     def draw_collider(self, event):
-        """Event callback for drawing a tile on the grid"""
+        """Event callback for drawing a collider on the grid"""
 
         if self.master.master.border_mode.get():
-            tile_x = int(self.canvas.xview()[0] * len(self.level.collider[0]) + event.x / 32)
-            tile_y = int(self.canvas.yview()[0] * len(self.level.collider) + event.y / 32)
-        else:
             tile_x = int(self.canvas.xview()[0] * (len(self.level.collider[0])-4) + event.x / 32)
             tile_y = int(self.canvas.yview()[0] * (len(self.level.collider)-4) + event.y / 32)
-            tile_x += 1
-            tile_y += 1
+        else:
+            tile_x = int(self.canvas.xview()[0] * (len(self.level.collider[0])-8) + event.x / 32)
+            tile_y = int(self.canvas.yview()[0] * (len(self.level.collider)-8) + event.y / 32)
+            tile_x += 2
+            tile_y += 2
 
         # Check to make sure tile is actually on the screen.  If not, cancel drawing.
         # Top side catch
@@ -1525,13 +1525,13 @@ class TilemapView(tk.Frame):
         self.saved = False
         self.update_title()
 
-        # Draw the tile
+        # Draw the collider
         self.canvas.create_rectangle((tile_x * 32, tile_y * 32, tile_x * 32 + 32, tile_y * 32 + 32),
                                      fill="gray",
                                      width=1,
                                      stipple="gray50")
 
-        # Add the tile to the tilemap matrix
+        # Add the collider to the collider matrix
         try:
             self.level.collider[tile_y][tile_x] = 1
         except IndexError:
