@@ -558,6 +558,7 @@ class TilemapEditorWindow(tk.Frame):
     collider_dict = {}
     loading_dict = {}
     light_dict = {}
+    ids_data = {}
     __initialized = False
 
     def __init__(self, parent, **kw):
@@ -1154,6 +1155,7 @@ class TilemapEditorWindow(tk.Frame):
             # Attempt to read data from file
             with open("assets/ids.json", mode="r") as f:
                 file_data = json.load(f)
+                cls.ids_data = file_data
                 # Load the tiles
                 for i in file_data["tile_ids"]:
                     img = Image.open("tiles/" + i["tex"])
@@ -1276,6 +1278,7 @@ class TilemapView(tk.Frame):
 
     def draw_collision(self):
         """Draw the collision map"""
+        self.apply_geometry()
         for i in range(self.level.level_width * 2 + 1):
             self.canvas.create_line(32 * i, 0, 32 * i, 64 * self.level.level_height, fill="BLACK", width=1.0)
         for i in range(self.level.level_height * 2 + 1):
@@ -1574,6 +1577,30 @@ class TilemapView(tk.Frame):
 
         # Add the collider to the collider matrix
         try:
+            # [ 1, 0 ] -> [0, 1, 2, 3]
+            # [ 2, 3 ]
+            # Determine which geometry sub-tile to modify
+            sub_x = round(tile_x / 2 - tile_x // 2 + 0.1)
+            sub_y = round(tile_y / 2 - tile_y // 2 + 0.1)
+            # Grab tile ID and layer
+            if self.level.decomap[tile_y // 2][tile_x // 2]:
+                target_id = self.level.decomap[tile_y // 2][tile_x // 2]
+                target_set = "deco_ids"
+            else:
+                target_id = self.level.tilemap[tile_y // 2][tile_x // 2]
+                target_set = "tile_ids"
+            # Modify tile's geometry
+            for i, j in enumerate(TilemapEditorWindow.ids_data[target_set]):
+                if j["id"] == target_id:
+                    if (sub_x, sub_y) == (0, 0):
+                        TilemapEditorWindow.ids_data[target_set][i]["geo"][1] = solid_state
+                    elif (sub_x, sub_y) == (0, 1):
+                        TilemapEditorWindow.ids_data[target_set][i]["geo"][2] = solid_state
+                    elif (sub_x, sub_y) == (1, 0):
+                        TilemapEditorWindow.ids_data[target_set][i]["geo"][0] = solid_state
+                    elif (sub_x, sub_y) == (1, 1):
+                        TilemapEditorWindow.ids_data[target_set][i]["geo"][3] = solid_state
+                    break
             self.level.collider[tile_y][tile_x] = solid_state
         except IndexError:
             pass
@@ -1718,6 +1745,28 @@ class TilemapView(tk.Frame):
             self.start_y = None
         self.canvas.scan_dragto(event.x, event.y, gain=1)
 
+    def apply_geometry(self):
+        """Applies the tile/deco geometry from ids_data"""
+        # Apply tile geometry
+        for x, i in enumerate(self.level.tilemap):
+            for y, j in enumerate(i):
+                for k in TilemapEditorWindow.ids_data["tile_ids"]:
+                    if k["id"] == j:
+                        self.level.collider[x*2][y*2] = k["geo"][1]
+                        self.level.collider[x*2][y*2+1] = k["geo"][0]
+                        self.level.collider[x*2+1][y*2] = k["geo"][2]
+                        self.level.collider[x*2+1][y*2+1] = k["geo"][3]
+
+        # Apply deco geometry
+        for x, i in enumerate(self.level.decomap):
+            for y, j in enumerate(i):
+                for k in TilemapEditorWindow.ids_data["deco_ids"]:
+                    if k["id"] == j:
+                        self.level.collider[x*2][y*2] ^= k["geo"][1]
+                        self.level.collider[x*2][y*2+1] ^= k["geo"][0]
+                        self.level.collider[x*2+1][y*2] ^= k["geo"][2]
+                        self.level.collider[x*2+1][y*2+1] ^= k["geo"][3]
+
     def load_from_file(self, file):
         """Loads level data from a .json file"""
         # TODO: Add function to check if data is formatted correctly
@@ -1727,6 +1776,7 @@ class TilemapView(tk.Frame):
             self.saved = True
         self.set_border(self.master.master.border_mode.get())
         self.update_title()
+        self.apply_geometry()
         self.redraw_view()
 
     def quick_save(self):
@@ -1736,6 +1786,10 @@ class TilemapView(tk.Frame):
     def save_to_file(self, file):
         """Saves the level data to a .json file"""
         # TODO: Test if saved files are actually loadable in engine.
+        # Save the ids_data to ids.json
+        with open("ids.json", mode="w") as f:
+            f.write(json.dump(f, TilemapEditorWindow.ids_data))
+
         # No file path has been set
         if file is None:
             file = filedialog.asksaveasfilename(filetypes=[('JSON File', '*.json')],
