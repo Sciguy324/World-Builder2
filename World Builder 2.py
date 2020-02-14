@@ -1298,9 +1298,9 @@ class TilemapView(tk.Frame):
                     solid_count = 0
                 last_k = k
 
-            # Entire row was solid, and never got a chance to fill in during loop.  Do so now.
+            # End of row was solid, and never got a chance to fill in during loop.  Do so now.
             if solid_count > 0:
-                self.canvas.create_rectangle((0, i * 32, last_k * 32 + 32, i * 32 + 32),
+                self.canvas.create_rectangle(((last_k - solid_count) * 32 + 32, i * 32, last_k * 32 + 32, i * 32 + 32),
                                              fill="gray",
                                              width=1,
                                              stipple="gray50")
@@ -1770,6 +1770,7 @@ class TilemapView(tk.Frame):
             level_data = json.load(f)
             self.level.load_from_json(level_data)
             self.saved = True
+            self.file_path = file
         self.set_border(self.master.master.border_mode.get())
         self.update_title()
         self.apply_geometry()
@@ -2033,6 +2034,7 @@ class LoadingZoneDict(CoordinateDict):
             result.append({"zone": list(i),
                            "target_level": j.target_level,
                            "target_pos": j.target_pos})
+        return result
 
 
 class LightmapDict(CoordinateDict):
@@ -2067,6 +2069,7 @@ class LightmapDict(CoordinateDict):
                            "red": j.red.jsonify(),
                            "green": j.green.jsonify(),
                            "blue": j.blue.jsonify()})
+        return result
 
 
 class SelectionPane(tk.Frame):
