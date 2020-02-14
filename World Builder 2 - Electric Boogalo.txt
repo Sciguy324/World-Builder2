@@ -22,7 +22,7 @@ Core Feature Elaboration:
 			--Decoration layer
 			--Collision map
 			--Loading zone layer
-			-Lighting layer
+			--Lighting layer
 			-Switching between panels for individual tiles and tile assemblies
 			--Dropdown box for selecting tile group
 		
@@ -43,9 +43,9 @@ Core Feature Elaboration:
 			-These are templates that place multiple of the same tile in a defined pattern
 			-For example: A template for placing an arbitrary tile in a 3x3 shape rather than a 1x1
 
-		-Collision geometry editor:
-			-Allows you to edit the collision geometry of a tile or tile assembly and apply to the map
-				-Prompt that asks if you want to apply changes to specially modified tiles
+		--Collision geometry editor:
+			--Allows you to edit the collision geometry of a tile or tile assembly and apply to the map
+				X-Prompt that asks if you want to apply changes to specially modified tiles
 			--Toggleable collision map overlay.
 
 		--Border:
