@@ -1535,11 +1535,11 @@ class TilemapView(tk.Frame):
         """Event callback for drawing a collider on the grid"""
 
         if self.master.master.border_mode.get():
+            tile_x = int(self.canvas.xview()[0] * (len(self.level.collider[0])) + event.x / 32)
+            tile_y = int(self.canvas.yview()[0] * (len(self.level.collider)) + event.y / 32)
+        else:
             tile_x = int(self.canvas.xview()[0] * (len(self.level.collider[0])-4) + event.x / 32)
             tile_y = int(self.canvas.yview()[0] * (len(self.level.collider)-4) + event.y / 32)
-        else:
-            tile_x = int(self.canvas.xview()[0] * (len(self.level.collider[0])-8) + event.x / 32)
-            tile_y = int(self.canvas.yview()[0] * (len(self.level.collider)-8) + event.y / 32)
             tile_x += 2
             tile_y += 2
 
@@ -1556,10 +1556,6 @@ class TilemapView(tk.Frame):
         # Right side catch
         if event.x / 64 > 16.55:
             return
-
-        # No longer saved
-        self.saved = False
-        self.update_title()
 
         solid_state = int(self.master.master.collision_id.get())
 
