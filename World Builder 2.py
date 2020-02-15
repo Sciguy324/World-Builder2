@@ -381,6 +381,7 @@ class LightEditorDialog(Dialog):
         self.result = self.light_data
 
 
+# TODO: Refactor ids list
 # TODO: Add collision geometry editor dialog
 # TODO: Add tile group editor dialog
 # TODO: Add tile assembly group editor dialog
