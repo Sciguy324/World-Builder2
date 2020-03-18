@@ -1960,9 +1960,11 @@ class Level:
         result.name = self.name
         result.level_width = self.level_width
         result.level_height = self.level_height
-        for k, (i, j) in enumerate(zip(self.tilemap, self.decomap)):
-            result.tilemap[k] = i.copy()
-            result.decomap[k] = j.copy()
+        result.tilemap = []
+        result.decomap = []
+        for i, j in zip(self.tilemap, self.decomap):
+            result.tilemap.append(i.copy())
+            result.decomap.append(j.copy())
         result.default_start = self.default_start.copy()
         result.lightmap = self.lightmap.copy()
         result.loading_zones = self.loading_zones.copy()

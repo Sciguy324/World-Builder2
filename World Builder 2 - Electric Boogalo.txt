@@ -1,11 +1,11 @@
 Core Features:
-	-Tilemap editing window
+	--Tilemap editing window
 	-Tile groups and assemblies
-	-Have multiple tilemaps open at once
+	--Have multiple tilemaps open at once
 	-World map window
-	-Opening/saving files in .json format that is compliant with engine
+	--Opening/saving files in .json format that is compliant with engine
 	-Sprite/entity editor
-	-Undo/redo feature
+	--Undo/redo feature
 
 Core Feature Elaboration:
 
@@ -55,7 +55,7 @@ Core Feature Elaboration:
 			--The border's visibility in the editor can be toggled using a button
 
 		-Quality of life tools:
-			-Undo/redo buttons and keyboard shortcuts
+			--Undo/redo buttons w/ keyboard shortcuts
 			--Separate row/column and x/y coordinate indicator
 			-"Draw-line" tool triggered by holding "shift"
 				-Releasing "shift" cancels, and blocks further drawing until mouse button is released
