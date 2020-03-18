@@ -688,6 +688,8 @@ class TilemapEditorWindow(tk.Frame):
         parent.master.bind("<Control-S>", self._save_map_as)
         parent.master.bind("<Control-n>", self.new_view)
         parent.master.bind("<Control-w>", self._close_view)
+        parent.master.bind("<Control-z>", self._undo)
+        parent.master.bind("<Control-y>", self._redo)
 
         # Set up level viewing section
         self.tilemap_panel = CustomNotebook(self)
@@ -822,6 +824,22 @@ class TilemapEditorWindow(tk.Frame):
             if self.view_list[event.x].close():
                 self.tilemap_panel.forget(event.x)
                 del self.view_list[event.x]
+
+    def _undo(self, event=None):
+        """Event callback for undoing"""
+        self.undo(self.tilemap_panel.index("current"))
+
+    def undo(self, index):
+        """Tell the tilemap at the given index to undo"""
+        self.view_list[index].undo()
+
+    def _redo(self, event=None):
+        """Event callback for undoing"""
+        self.redo(self.tilemap_panel.index("current"))
+
+    def redo(self, index):
+        """Tell the tilemap at the given index to redo"""
+        self.view_list[index].redo()
 
     @staticmethod
     def unimplemented(self, event=None):
@@ -1208,7 +1226,16 @@ class TilemapView(tk.Frame):
 
         # Declare the tilemap data
         self.level = Level()
+        self.past_states = []
+        self.future_states = []
         self.file_path = None
+
+        self.backup_state()
+
+        # Note: Past/current/future level state data follows the format:
+        # past_states: [oldest -> newest], excluding current state
+        # level: current state
+        # future_states: [oldest -> newest], excluding current state
 
         # Create element layout
         self.frame = tk.Frame(parent, borderwidth=1, relief=tk.SUNKEN)
@@ -1402,31 +1429,30 @@ class TilemapView(tk.Frame):
                 self.canvas.unbind(i)
             # Tilemap mode
             if self.master.master.layer.get() == 0:
-                self.canvas.bind("<ButtonPress-1>", self.draw_tile)
+                #self.canvas.bind("<ButtonPress-1>", self.draw_tile)
                 self.canvas.bind("<B1-Motion>", self.draw_tile)
-                # self.canvas.bind("<ButtonRelease-1>", self._draw_tile_and_grid)
-                self.canvas.bind("<ButtonRelease-1>", lambda event: self._draw_with_grid(event, self.draw_tile))
+                self.canvas.bind("<ButtonRelease-1>", lambda event: self._draw_with_object(event, self.draw_tile))
+                self.canvas.bind("<ButtonPress-1>", lambda event: self._draw_with_object(event, self.draw_tile))
             # Decomap mode
             elif self.master.master.layer.get() == 1:
                 self.canvas.bind("<ButtonPress-1>", self.draw_deco)
                 self.canvas.bind("<B1-Motion>", self.draw_deco)
-                # self.canvas.bind("<ButtonRelease-1>", self._draw_deco_and_grid)
-                self.canvas.bind("<ButtonRelease-1>", lambda event: self._draw_with_grid(event, self.draw_deco))
+                self.canvas.bind("<ButtonRelease-1>", lambda event: self._draw_with_object(event, self.draw_deco))
             # Collision map mode
             elif self.master.master.layer.get() == 2:
                 self.canvas.bind("<ButtonPress-1>", self.draw_collider)
                 self.canvas.bind("<B1-Motion>", self.draw_collider)
-                self.canvas.bind("<ButtonRelease-1>", lambda event: self._draw_with_grid(event, self.draw_collider))
+                self.canvas.bind("<ButtonRelease-1>", lambda event: self._draw_with_object(event, self.draw_collider))
             # Loading zone mode
             elif self.master.master.layer.get() == 3:
                 self.canvas.bind("<ButtonPress-1>", self.draw_zone)
                 self.canvas.bind("<B1-Motion>", self.draw_zone)
-                self.canvas.bind("<ButtonRelease-1>", lambda event: self._draw_with_grid(event, self.draw_zone))
+                self.canvas.bind("<ButtonRelease-1>", lambda event: self._draw_with_object(event, self.draw_zone))
             # Lightmap mode
             elif self.master.master.layer.get() == 4:
                 self.canvas.bind("<ButtonPress-1>", self.draw_light)
                 self.canvas.bind("<B1-Motion>", self.draw_light)
-                self.canvas.bind("<ButtonRelease-1>", lambda event: self._draw_with_grid(event, self.draw_light))
+                self.canvas.bind("<ButtonRelease-1>", lambda event: self._draw_with_object(event, self.draw_light))
             self.canvas.config(cursor="pencil")
         elif value == 1:
             # Movement controls
@@ -1436,8 +1462,9 @@ class TilemapView(tk.Frame):
             self.canvas.bind("<B1-Motion>", self.move)
             self.canvas.config(cursor="fleur")
 
-    def _draw_with_grid(self, event, draw_function):
+    def _draw_with_object(self, event, draw_function):
         self.canvas.delete("all")
+        self.backup_state()
         draw_function(event)
         self.redraw_view()
 
@@ -1669,8 +1696,6 @@ class TilemapView(tk.Frame):
                 new_zone.target_pos[1] += tile_y - self.copied_zone_coords[1]
                 self.level.loading_zones[tile_x, tile_y] = new_zone
 
-        # print("Loading zones:", self.level.loading_zones)
-
     def draw_light(self, event):
         """Event callback for drawing a light"""
         # Check to make sure tile is actually on the screen.  If not, cancel drawing.
@@ -1767,6 +1792,7 @@ class TilemapView(tk.Frame):
     def load_from_file(self, file):
         """Loads level data from a .json file"""
         # TODO: Add function to check if data is formatted correctly
+        self.backup_state()
         with open(file, mode="r") as f:
             level_data = json.load(f)
             self.level.load_from_json(level_data)
@@ -1808,6 +1834,44 @@ class TilemapView(tk.Frame):
             f.write(self.level.jsonify())
         self.saved = True
         self.update_title()
+
+    def backup_state(self):
+        """Save a backup of the current level state"""
+        # Only update if something changed.
+        if len(self.past_states) == 0 or self.level != self.past_states[-1]:
+            self.past_states.append(self.level.copy())
+            self.future_states = []
+
+    def undo(self):
+        """Return to the previous level state"""
+        if len(self.past_states) > 0:
+            # If the current state is identical to the previous, go back two states
+            if self.level == self.past_states[-1]:
+                self.future_states.insert(0, self.level.copy())
+                self.level = self.past_states.pop(-1).copy()
+                if len(self.past_states) <= 0:
+                    return
+
+            # Save current state to future, and load an older one
+            self.future_states.insert(0, self.level.copy())
+            self.level = self.past_states.pop(-1).copy()
+
+            # Reload map and update saved status
+            self.redraw_view()
+            self.saved = False
+            self.update_title()
+
+    def redo(self):
+        """Return to a future level state"""
+        if len(self.future_states) > 0:
+            # Save currents state to past, and load a future one
+            self.past_states.append(self.level.copy())
+            self.level = self.future_states.pop(0).copy()
+
+            # Reload map and update saved status
+            self.redraw_view()
+            self.saved = False
+            self.update_title()
 
     @classmethod
     def _initialize(cls):
@@ -1860,6 +1924,18 @@ class Level:
         self.lightmap = LightmapDict()
         self.loading_zones = LoadingZoneDict()
 
+    def __eq__(self, other):
+        if type(other) != Level:
+            return False
+        else:
+            return str(self.jsonify()) == str(other.jsonify())
+
+    def __ne__(self, other):
+        if type(other) != Level:
+            return True
+        else:
+            return str(self.jsonify()) != str(other.jsonify())
+
     def load_from_json(self, data):
         """Load level data from a JSON representation"""
         self.tilemap = data["tilemap"]
@@ -1877,6 +1953,20 @@ class Level:
         self.name = data["name"]
         self.level_width = len(self.tilemap[0])
         self.level_height = len(self.tilemap)
+
+    def copy(self):
+        """Return a copy of the level data"""
+        result = Level()
+        result.name = self.name
+        result.level_width = self.level_width
+        result.level_height = self.level_height
+        for k, (i, j) in enumerate(zip(self.tilemap, self.decomap)):
+            result.tilemap[k] = i.copy()
+            result.decomap[k] = j.copy()
+        result.default_start = self.default_start.copy()
+        result.lightmap = self.lightmap.copy()
+        result.loading_zones = self.loading_zones.copy()
+        return result
 
     def jsonify(self):
         """Convert the level to a JSON representation"""
@@ -2028,6 +2118,12 @@ class LoadingZoneDict(CoordinateDict):
         """Check to make sure the value type is a LoadingZone"""
         return type(value) == LoadingZone
 
+    def copy(self):
+        """Return a new copy of the loading zone dictionary"""
+        result = LoadingZoneDict()
+        result.data = self.data.copy()
+        return result
+
     def jsonify(self):
         """Convert into a list representation for use in a JSON tag"""
         result = []
@@ -2059,6 +2155,12 @@ class LightmapDict(CoordinateDict):
     def check_type(value):
         """Check to make sure the value type is a Light"""
         return type(value) == Light
+
+    def copy(self):
+        """Return a new copy of the lightmap dictionary"""
+        result = LightmapDict()
+        result.data = self.data.copy()
+        return result
 
     def jsonify(self):
         """Convert into a list representation for use in a JSON tag"""
@@ -2150,47 +2252,34 @@ class TileCollection(TilePane):
         # Save a reference to the tracker variable
         self.var_ref = var
 
+        # If mode = "tile" load from tileset, if mode = "deco" load from decoset, etc.
+        if mode == "tile":
+            image_dict = TilemapEditorWindow.tile_dict
+        elif mode == "deco":
+            image_dict = TilemapEditorWindow.deco_dict
+        elif mode == "collision":
+            image_dict = TilemapEditorWindow.collider_dict
+        elif mode == "loading":
+            image_dict = TilemapEditorWindow.loading_dict
+        elif mode == "light":
+            image_dict = TilemapEditorWindow.light_dict
+        else:
+            raise ValueError("Cannot initialize TileCollection with unknown mode '{}'."
+                             "  Options are 'tile,' 'deco,' 'collision,' 'loading' and 'light'".format(mode))
+
         # TODO: Add a configuration option for changing the width of the pane
         # Iterate through group to declare tile images in a HEIGHT x 3 grid
+
         for i in group:
             if self.current_x == 3:
                 self.current_y += 1
                 self.current_x = 0
-            # If mode = "tile" load from tileset.  If mode = "deco" load from decoset
-            # TODO: Condense these radiobutton cases
-            if mode == "tile":
-                radiobutton = tk.Radiobutton(self.canvas,
-                                             indicator=0,
-                                             value=i,
-                                             variable=var,
-                                             image=TilemapEditorWindow.tile_dict[i])
-            elif mode == "deco":
-                radiobutton = tk.Radiobutton(self.canvas,
-                                             indicator=0,
-                                             value=i,
-                                             variable=var,
-                                             image=TilemapEditorWindow.deco_dict[i])
-            elif mode == "collision":
-                radiobutton = tk.Radiobutton(self.canvas,
-                                             indicator=0,
-                                             value=i,
-                                             variable=var,
-                                             image=TilemapEditorWindow.collider_dict[i])
-            elif mode == "loading":
-                radiobutton = tk.Radiobutton(self.canvas,
-                                             indicator=0,
-                                             value=i,
-                                             variable=var,
-                                             image=TilemapEditorWindow.loading_dict[i])
-            elif mode == "light":
-                radiobutton = tk.Radiobutton(self.canvas,
-                                             indicator=0,
-                                             value=i,
-                                             variable=var,
-                                             image=TilemapEditorWindow.light_dict[i])
-            else:
-                raise ValueError("Cannot initialize TileCollection with unknown mode '{}'."
-                                 "  Options are 'tile,' 'deco,' 'collision,' 'loading' and 'light'".format(mode))
+
+            radiobutton = tk.Radiobutton(self.canvas,
+                                         indicator=0,
+                                         value=i,
+                                         variable=var,
+                                         image=image_dict[i])
 
             # Configure new radiobutton
             self.canvas.create_window(self.current_x * 72 + 36, self.current_y * 72 + 36, window=radiobutton)
