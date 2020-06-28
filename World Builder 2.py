@@ -1946,6 +1946,8 @@ class Level:
     def load_from_json(self, data):
         """Load level data from a JSON representation"""
         self.tilemap = data["tilemap"]
+        self.level_width = len(self.tilemap[0])
+        self.level_height = len(self.tilemap)
         self.decomap = Decomap()
 #        for i, j in enumerate(data["decomap"]):
 #            for k, m in enumerate(j):
@@ -1954,7 +1956,7 @@ class Level:
         for i, j, k in data["decomap"]:
             self.decomap.add(j, k, i)
 
-        self.collider = data["colliders"]
+        self.collider = [[0] * (self.level_width * 2) for i in range(self.level_height * 2)]
         self.loading_zones = LoadingZoneDict()
         for i in data["loading_zones"]:
             self.loading_zones[i["zone"][0], i["zone"][1]] = LoadingZone(i["target_level"], i["target_pos"])
@@ -1965,8 +1967,6 @@ class Level:
             self.lightmap[i["pos"][0], i["pos"][1]] = Light(i["diameter"], red, green, blue, i["blacklight"], True)
         self.default_start = data["spawn"]
         self.name = data["name"]
-        self.level_width = len(self.tilemap[0])
-        self.level_height = len(self.tilemap)
 
     def copy(self):
         """Return a copy of the level data"""
@@ -1988,7 +1988,7 @@ class Level:
         # Generate json string
         result = json.dumps({"tilemap": self.tilemap,
                              "decomap": self.decomap.jsonify(),
-                             "colliders": self.collider,
+                             # "colliders": self.collider,
                              "loading_zones": self.loading_zones.jsonify(),
                              "lightmap": self.lightmap.jsonify(),
                              "spawn": self.default_start,
