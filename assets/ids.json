@@ -68,17 +68,17 @@
     {
       "id": 13,
       "tex": "top_water.png",
-      "geo": [0, 0, 1, 1]
+      "geo": [0, 1, 0, 1]
     },
     {
       "id": 14,
       "tex": "top_right_water.png",
-      "geo": [0, 0, 1, 0]
+      "geo": [0, 1, 0, 0]
     },
     {
       "id": 15,
       "tex": "left_water.png",
-      "geo": [1, 0, 0, 1]
+      "geo": [0, 0, 1, 1]
     },
     {
       "id": 16,
@@ -88,22 +88,22 @@
     {
       "id": 17,
       "tex": "right_water.png",
-      "geo": [0, 1, 1, 0]
+      "geo": [1, 1, 0, 0]
     },
     {
       "id": 18,
       "tex": "bottom_left_water.png",
-      "geo": [1, 0, 0, 1]
+      "geo": [0, 0, 1, 1]
     },
     {
       "id": 19,
       "tex": "bottom_water.png",
-      "geo": [0, 0, 1, 1]
+      "geo": [0, 1, 0, 1]
     },
     {
       "id": 20,
       "tex": "bottom_right_water.png",
-      "geo": [0, 1, 1, 0]
+      "geo": [1, 1, 0, 0]
     },
     {
       "id": 21,
@@ -193,7 +193,7 @@
     {
       "id": 38,
       "tex": "water_corner2.png",
-      "geo": [1, 0, 0, 1]
+      "geo": [0, 0, 1, 1]
     },
     {
       "id": 39,
@@ -203,7 +203,7 @@
     {
       "id": 40,
       "tex": "water_corner4.png",
-      "geo": [0, 0, 1, 0]
+      "geo": [0, 1, 0, 0]
     },
     {
       "id": 41,
@@ -253,7 +253,7 @@
     {
       "id": 50,
       "tex": "cliff_left.png",
-      "geo": [0, 1, 1, 0]
+      "geo": [1, 1, 0, 0]
     },
     {
       "id": 51,
@@ -263,7 +263,7 @@
     {
       "id": 52,
       "tex": "cliff_right.png",
-      "geo": [1, 0, 0, 1]
+      "geo": [0, 0, 1, 1]
     },
     {
       "id": 53,
@@ -388,7 +388,7 @@
     {
       "id": 77,
       "tex": "white_green_wall_painting_base.png",
-      "geo": [0, 0, 1, 1]
+      "geo": [0, 1, 0, 1]
     },
     {
       "id": 78,
@@ -403,7 +403,7 @@
     {
       "id": 80,
       "tex": "drawer_legs.png",
-      "geo": [1, 1, 0, 0]
+      "geo": [1, 0, 1, 0]
     },
     {
       "id": 81,
@@ -458,7 +458,7 @@
       "id": 2,
       "tex": "table_top_left.png",
       "height": 1,
-      "geo": [0, 0, 1, 1]
+      "geo": [0, 1, 0, 1]
     },
     {
       "id": 3,
@@ -470,7 +470,7 @@
       "id": 4,
       "tex": "table_top_right.png",
       "height": 1,
-      "geo": [0, 0, 1, 1]
+      "geo": [0, 1, 0, 1]
     },
     {
       "id": 5,
@@ -638,19 +638,19 @@
       "id": 32,
       "tex": "tree_trunk.png",
       "height": 1,
-      "geo": [0, 0, 1, 1]
+      "geo": [0, 1, 0, 1]
     },
     {
       "id": 33,
       "tex": "lamp_post_bottom.png",
       "height": 1,
-      "geo": [0, 0, 1, 1]
+      "geo": [0, 1, 0, 1]
     },
     {
       "id": 34,
       "tex": "table.png",
       "height": 1,
-      "geo": [0, 0, 1, 1]
+      "geo": [0, 1, 0, 1]
     }
   ]
 }

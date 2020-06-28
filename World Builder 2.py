@@ -1602,8 +1602,8 @@ class TilemapView(tk.Frame):
 
         # Add the collider to the collider matrix
         try:
-            # [ 1, 0 ] -> [0, 1, 2, 3]
-            # [ 2, 3 ]
+            # [ 0, 2 ] -> [0, 1, 2, 3]
+            # [ 1, 3 ]
             # Determine which geometry sub-tile to modify
             sub_x = round(tile_x / 2 - tile_x // 2 + 0.1)
             sub_y = round(tile_y / 2 - tile_y // 2 + 0.1)
@@ -1618,11 +1618,11 @@ class TilemapView(tk.Frame):
             for i, j in enumerate(TilemapEditorWindow.ids_data[target_set]):
                 if j["id"] == target_id:
                     if (sub_x, sub_y) == (0, 0):
-                        TilemapEditorWindow.ids_data[target_set][i]["geo"][1] = solid_state
-                    elif (sub_x, sub_y) == (0, 1):
-                        TilemapEditorWindow.ids_data[target_set][i]["geo"][2] = solid_state
-                    elif (sub_x, sub_y) == (1, 0):
                         TilemapEditorWindow.ids_data[target_set][i]["geo"][0] = solid_state
+                    elif (sub_x, sub_y) == (0, 1):
+                        TilemapEditorWindow.ids_data[target_set][i]["geo"][1] = solid_state
+                    elif (sub_x, sub_y) == (1, 0):
+                        TilemapEditorWindow.ids_data[target_set][i]["geo"][2] = solid_state
                     elif (sub_x, sub_y) == (1, 1):
                         TilemapEditorWindow.ids_data[target_set][i]["geo"][3] = solid_state
                     break
@@ -1776,22 +1776,22 @@ class TilemapView(tk.Frame):
                 self.level.collider[i][k] = 0
 
         # Apply tile geometry
-        for x, i in enumerate(self.level.tilemap):
-            for y, j in enumerate(i):
+        for y, i in enumerate(self.level.tilemap):
+            for x, j in enumerate(i):
                 for k in TilemapEditorWindow.ids_data["tile_ids"]:
                     if k["id"] == j:
-                        self.level.collider[x*2][y*2] = k["geo"][1]
-                        self.level.collider[x*2][y*2+1] = k["geo"][0]
-                        self.level.collider[x*2+1][y*2] = k["geo"][2]
-                        self.level.collider[x*2+1][y*2+1] = k["geo"][3]
+                        self.level.collider[y*2][x*2] = k["geo"][0]
+                        self.level.collider[y*2+1][x*2] = k["geo"][1]
+                        self.level.collider[y*2][x*2+1] = k["geo"][2]
+                        self.level.collider[y*2+1][x*2+1] = k["geo"][3]
 
         # Apply deco geometry
         for deco_id, x, y in self.level.decomap:
             for i in TilemapEditorWindow.ids_data["deco_ids"]:
                 if i["id"] == deco_id:
-                    self.level.collider[y*2][x*2] ^= i["geo"][1]
-                    self.level.collider[y*2][x*2+1] ^= i["geo"][0]
-                    self.level.collider[y*2+1][x*2] ^= i["geo"][2]
+                    self.level.collider[y*2][x*2] ^= i["geo"][0]
+                    self.level.collider[y*2+1][x*2] ^= i["geo"][1]
+                    self.level.collider[y*2][x*2+1] ^= i["geo"][2]
                     self.level.collider[y*2+1][x*2+1] ^= i["geo"][3]
 
     def load_from_file(self, file):
