@@ -5,6 +5,7 @@ from tkinter import ttk
 from PIL import ImageTk, Image
 from os import path
 import json
+import re
 
 
 class ScrollbarEntry(tk.Frame):
@@ -1348,11 +1349,11 @@ class TilemapView(tk.Frame):
                     self.canvas.create_image((k * 64 + 32, i * 64 + 32), image=TilemapEditorWindow.tile_dict[m])
 
     def draw_decomap(self):
-        """Draw the current level"""
-        for i, j in enumerate(self.level.decomap):
-            for k, m in enumerate(j):
-                if m != 0:
-                    self.canvas.create_image((k * 64 + 32, i * 64 + 32), image=TilemapEditorWindow.deco_dict[m])
+        """Draw the current level's decomap"""
+        self.level.decomap.sort()
+        for deco_id, x, y in self.level.decomap:
+            if deco_id != 0:
+                self.canvas.create_image((x * 64 + 32, y * 64 + 32), image=TilemapEditorWindow.deco_dict[deco_id])
 
     def draw_loading_zones(self):
         """Draw the loading zones"""
@@ -1553,11 +1554,11 @@ class TilemapView(tk.Frame):
         # Draw the tile
         self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
                                  image=TilemapEditorWindow.deco_dict[self.current_tile])
-        # Add the tile to the tilemap matrix
-        try:
-            self.level.decomap[tile_y][tile_x] = int(self.current_tile)
-        except IndexError:
-            pass
+        # Add the tile to the decomap
+        if int(self.current_tile) == 0:
+            self.level.decomap.remove(tile_x, tile_y)
+        else:
+            self.level.decomap.add(tile_x, tile_y, int(self.current_tile))
 
     def draw_collider(self, event):
         """Event callback for drawing a collider on the grid"""
@@ -1607,8 +1608,8 @@ class TilemapView(tk.Frame):
             sub_x = round(tile_x / 2 - tile_x // 2 + 0.1)
             sub_y = round(tile_y / 2 - tile_y // 2 + 0.1)
             # Grab tile ID and layer
-            if self.level.decomap[tile_y // 2][tile_x // 2]:
-                target_id = self.level.decomap[tile_y // 2][tile_x // 2]
+            if self.level.decomap[tile_x // 2, tile_y // 2]:
+                target_id = self.level.decomap[tile_x // 2, tile_y // 2][-1][0]
                 target_set = "deco_ids"
             else:
                 target_id = self.level.tilemap[tile_y // 2][tile_x // 2]
@@ -1780,14 +1781,13 @@ class TilemapView(tk.Frame):
                         self.level.collider[x*2+1][y*2+1] = k["geo"][3]
 
         # Apply deco geometry
-        for x, i in enumerate(self.level.decomap):
-            for y, j in enumerate(i):
-                for k in TilemapEditorWindow.ids_data["deco_ids"]:
-                    if k["id"] == j:
-                        self.level.collider[x*2][y*2] ^= k["geo"][1]
-                        self.level.collider[x*2][y*2+1] ^= k["geo"][0]
-                        self.level.collider[x*2+1][y*2] ^= k["geo"][2]
-                        self.level.collider[x*2+1][y*2+1] ^= k["geo"][3]
+        for deco_id, x, y in self.level.decomap:
+            for i in TilemapEditorWindow.ids_data["deco_ids"]:
+                if i["id"] == deco_id:
+                    self.level.collider[y*2][x*2] ^= i["geo"][1]
+                    self.level.collider[y*2][x*2+1] ^= i["geo"][0]
+                    self.level.collider[y*2+1][x*2] ^= i["geo"][2]
+                    self.level.collider[y*2+1][x*2+1] ^= i["geo"][3]
 
     def load_from_file(self, file):
         """Loads level data from a .json file"""
@@ -1812,7 +1812,9 @@ class TilemapView(tk.Frame):
         # TODO: Test if saved files are actually loadable in engine.
         # Save the ids_data to ids.json
         with open("assets/ids.json", mode="w") as f:
-            json.dump(TilemapEditorWindow.ids_data, f)
+            ids_data = json.dumps(TilemapEditorWindow.ids_data, indent=2)
+            ids_data = re.sub(r'\[\s+(\d),\s+(\d),\s+(\d),\s+(\d)\s+\]', r'[\1, \2, \3, \4]', ids_data)
+            f.write(ids_data)
 
         # No file path has been set
         if file is None:
@@ -1918,7 +1920,7 @@ class Level:
         self.level_width = 16 + 2
         self.level_height = 9 + 2
         self.tilemap = [[0] * self.level_width for i in range(self.level_height)]
-        self.decomap = [[0] * self.level_width for i in range(self.level_height)]
+        self.decomap = Decomap()
         self.collider = [[0] * (self.level_width * 2) for i in range(self.level_height * 2)]
         self.default_start = [0, 0]
         self.lightmap = LightmapDict()
@@ -1939,7 +1941,12 @@ class Level:
     def load_from_json(self, data):
         """Load level data from a JSON representation"""
         self.tilemap = data["tilemap"]
-        self.decomap = data["decomap"]
+        self.decomap = Decomap()
+        for i, j in enumerate(data["decomap"]):
+            for k, m in enumerate(j):
+                if m != 0:
+                    self.decomap.add(k, i, m)
+
         self.collider = data["colliders"]
         self.loading_zones = LoadingZoneDict()
         for i in data["loading_zones"]:
@@ -1961,10 +1968,9 @@ class Level:
         result.level_width = self.level_width
         result.level_height = self.level_height
         result.tilemap = []
-        result.decomap = []
-        for i, j in zip(self.tilemap, self.decomap):
+        for i in self.tilemap:
             result.tilemap.append(i.copy())
-            result.decomap.append(j.copy())
+        result.decomap = self.decomap.copy()
         result.default_start = self.default_start.copy()
         result.lightmap = self.lightmap.copy()
         result.loading_zones = self.loading_zones.copy()
@@ -1972,13 +1978,97 @@ class Level:
 
     def jsonify(self):
         """Convert the level to a JSON representation"""
-        return json.dumps({"tilemap": self.tilemap,
-                           "decomap": self.decomap,
-                           "colliders": self.collider,
-                           "loading_zones": self.loading_zones.jsonify(),
-                           "lightmap": self.lightmap.jsonify(),
-                           "spawn": self.default_start,
-                           "name": self.name})
+        # Generate json string
+        result = json.dumps({"tilemap": self.tilemap,
+                             "decomap": self.decomap.jsonify(),
+                             "colliders": self.collider,
+                             "loading_zones": self.loading_zones.jsonify(),
+                             "lightmap": self.lightmap.jsonify(),
+                             "spawn": self.default_start,
+                             "name": self.name}, indent=2)
+        # Format json string
+        result = re.sub(r'\s+([0-9.\-]+),', r'\1, ', result)
+        result = re.sub(r'\s+([0-9.\-]+)\s+\]', r' \1]', result)
+        result = re.sub(r':([0-9.\-]+)', r': \1', result)
+        return result
+
+
+class Decomap:
+    """Container structure for decomap data"""
+
+    # Data structure: [[id, x, y],...]
+    # TODO: Make this structure more consistent, perhaps by making elements their own data type
+    def __init__(self):
+        self.values = []
+
+    def __repr__(self):
+        return self.values.__repr__()
+
+    def __getitem__(self, key):
+        """Get a list of all entries with the given coordinates"""
+        if len(key) == 2 and type(key[0]) == int and type(key[1]) == int:
+            result = [i for i in self.values if i[1] == key[0] and i[2] == key[1]]
+            if len(result) == 0:
+                return None
+            else:
+                return result
+        else:
+            raise TypeError("'{}' is not a valid key!".format(key))
+
+    def __contains__(self, key):
+        """Check if decomap contains something at the coordinates x-y (deco-id is optional)"""
+        if len(key) == 2 and type(key[0]) == int and type(key[1]) == int:
+            for deco_id, x, y in self.values:
+                if x == key[0] and y == key[1]:
+                    return True
+        elif len(key) == 3 and all([type(i) == int for i in key]):
+            for deco_id, x, y in self.values:
+                if x == key[0] and y == key[1] and deco_id == key[2]:
+                    return True
+        else:
+            raise TypeError("'{}' is not a valid key!".format(key))
+        return False
+
+    def __iter__(self):
+        """Returns an iterable version of the decomap"""
+        return self.values.__iter__()
+
+    def copy(self):
+        """Returns a copy of the decomap"""
+        result = Decomap()
+        result.values = [i.copy() for i in self.values]
+        return result
+
+    def add(self, x, y, deco_id):
+        """Add an item to the decomap"""
+        already_exists = False
+        for i, j, k in self.values:
+            if j == x and k == y and i == deco_id:
+                already_exists = True
+
+        if not already_exists:
+            self.values.append([deco_id, x, y])
+
+    def remove(self, x, y, deco_id=None):
+        """Remove all items at the coordinates x-y from the decomap"""
+        if deco_id:
+            self.values = [[i, j, k] for i, j, k in self.values if not(j == x and k == y and i == deco_id)]
+        else:
+            self.values = [[i, j, k] for i, j, k in self.values if not(j == x and k == y)]
+
+    def set(self, x, y, deco_id):
+        """Remove all entries that have the given coordinates and append a new value"""
+        self.remove(x, y)
+        self.add(x, y, deco_id)
+
+    def sort(self):
+        """Sort the decomap elements in order of height+row"""
+        # TODO: Make accessing tiles in ids_data dependent on actual id tag
+        self.values = sorted(self.values, key=lambda x: TilemapEditorWindow.ids_data["deco_ids"][x[0]]["height"] + x[2])
+
+    def jsonify(self):
+        """Convert the decomap into json format"""
+        return self.copy().values
 
 
 class LoadingZone:
