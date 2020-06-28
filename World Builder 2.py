@@ -1770,6 +1770,11 @@ class TilemapView(tk.Frame):
 
     def apply_geometry(self):
         """Applies the tile/deco geometry from ids_data"""
+        # Reset map
+        for i, j in enumerate(self.level.collider):
+            for k, m in enumerate(j):
+                self.level.collider[i][k] = 0
+
         # Apply tile geometry
         for x, i in enumerate(self.level.tilemap):
             for y, j in enumerate(i):
@@ -1942,10 +1947,12 @@ class Level:
         """Load level data from a JSON representation"""
         self.tilemap = data["tilemap"]
         self.decomap = Decomap()
-        for i, j in enumerate(data["decomap"]):
-            for k, m in enumerate(j):
-                if m != 0:
-                    self.decomap.add(k, i, m)
+#        for i, j in enumerate(data["decomap"]):
+#            for k, m in enumerate(j):
+#                if m != 0:
+#                    self.decomap.add(k, i, m)
+        for i, j, k in data["decomap"]:
+            self.decomap.add(j, k, i)
 
         self.collider = data["colliders"]
         self.loading_zones = LoadingZoneDict()
