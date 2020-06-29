@@ -2189,6 +2189,9 @@ class Decomap:
 
     def jsonify(self):
         """Convert the decomap into json format"""
+        # Ensure decomap is properly sorted
+        self.sort()
+        # Return a copy
         return self.copy().values
 
 
