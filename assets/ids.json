@@ -292,12 +292,12 @@
     },
     {
       "id": 58,
-      "tex": "missing.png",
+      "tex": "cliff_back_left_corner.png",
       "geo": [0, 0, 1, 1]
     },
     {
       "id": 59,
-      "tex": "missing.png",
+      "tex": "cliff_back_right_corner.png",
       "geo": [0, 0, 1, 1]
     },
     {

@@ -57,6 +57,7 @@ Core Feature Elaboration:
 		-Quality of life tools:
 			--Undo/redo buttons w/ keyboard shortcuts
 			--Separate row/column and x/y coordinate indicator
+			--Tool to change tilemap size
 			-"Draw-line" tool triggered by holding "shift"
 				-Releasing "shift" cancels, and blocks further drawing until mouse button is released
 				-Line indicator visible while in use

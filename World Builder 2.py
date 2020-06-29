@@ -563,6 +563,34 @@ class TilemapEditorWindow(tk.Frame):
     ids_data = {}
     __initialized = False
 
+    class Decorators(object):
+        @classmethod
+        def apply_to_current_view(cls, function):
+            """Apply a function to the currently open view, if one is open.  The index of the current view is passed as
+             the x-coordinate of event"""
+
+            def inner(self, event=None):
+                if self.master.index("current") != 0:
+                    return
+                function(self, self.tilemap_panel.index("current"))
+
+            return inner
+
+        @classmethod
+        def hidden_event(cls, function):
+            """For functions that should not be run if no views are currently open.
+            An unused event argument is expected"""
+            def inner(self, event=None):
+                function(self)
+            return inner
+
+        @classmethod
+        def callback(cls, function):
+            """Reduces the unneeded 'name=None, index=None, op=None' arguments in callback functions"""
+            def inner(self, name=None, index=None, op=None):
+                function(self)
+            return inner
+
     def __init__(self, parent, **kw):
         """Overarching editor window for the levels"""
         # Ensure PhotoImages are initialized before proceeding
@@ -605,18 +633,16 @@ class TilemapEditorWindow(tk.Frame):
         self.deco_id = tk.IntVar(self, 0, "selected_deco")
         self.deco_id.trace("w", self.deco_id_callback)
 
-        # TODO: Remove all of these something_id_callback functions
-        # Add the deco ID tracking variable
+        # NOTE: Wait, what?  I cannot remember for the life of me why these something_id_callback functions are needed,
+        # but tile and deco drawing breaks completely without them.
+        # Add the collision ID tracking variable
         self.collision_id = tk.IntVar(self, 0, "selected_collision")
-        self.collision_id.trace("w", self.deco_id_callback)
 
         # Add the loading ID tracking variable
         self.loading_id = tk.IntVar(self, 0, "selected_loading")
-        self.loading_id.trace("w", self.deco_id_callback)
 
         # Add the light ID tracking variable
         self.light_id = tk.IntVar(self, 0, "selected_light")
-        self.light_id.trace("w", self.deco_id_callback)
 
         # Add the group tracking variable
         self.group = tk.StringVar(self, "", "selected_group")
@@ -689,8 +715,8 @@ class TilemapEditorWindow(tk.Frame):
         parent.master.bind("<Control-S>", self._save_map_as)
         parent.master.bind("<Control-n>", self.new_view)
         parent.master.bind("<Control-w>", self._close_view)
-        parent.master.bind("<Control-z>", self._undo)
-        parent.master.bind("<Control-y>", self._redo)
+        parent.master.bind("<Control-z>", self.undo)
+        parent.master.bind("<Control-y>", self.redo)
 
         # Set up level viewing section
         self.tilemap_panel = CustomNotebook(self)
@@ -728,10 +754,10 @@ class TilemapEditorWindow(tk.Frame):
 
         # Create the edit menubar
         self.editmenu = tk.Menu(self.menubar, tearoff=0)
-        self.editmenu.add_command(label="Undo (Ctrl-Z)", command=self.unimplemented)
-        self.editmenu.add_command(label="Redo (Ctrl-Y)", command=self.unimplemented)
+        self.editmenu.add_command(label="Undo (Ctrl-Z)", command=self.undo)
+        self.editmenu.add_command(label="Redo (Ctrl-Y)", command=self.redo)
         self.editmenu.add_separator()
-        self.editmenu.add_command(label="Change Tilemap Size", command=self.unimplemented)
+        self.editmenu.add_command(label="Change Tilemap Size", command=self.change_tilemap_size)
         self.editmenu.add_separator()
         self.editmenu.add_command(label="Set Default Spawn", command=self._edit_default_spawn)
         self.menubar.add_cascade(label="Edit", menu=self.editmenu, command=self.unimplemented)
@@ -761,7 +787,8 @@ class TilemapEditorWindow(tk.Frame):
         # Create initial tilemap view
         self.new_view()
 
-    def _open_map(self, event=None):
+    @Decorators.hidden_event
+    def _open_map(self):
         """Event callback for opening a level"""
         if self.master.index("current") != 0:
             return
@@ -775,26 +802,30 @@ class TilemapEditorWindow(tk.Frame):
         self.new_view()
         self.view_list[self.tilemap_panel.index("current")].load_from_file(file)
 
-    def _save_map(self, event=None):
+    @Decorators.hidden_event
+    def _save_map(self):
         """Event callback for saving a level"""
         if self.master.index("current") != 0:
             return
         self.view_list[self.tilemap_panel.index("current")].quick_save()
 
-    def _save_map_as(self, event=None):
+    @Decorators.hidden_event
+    def _save_map_as(self):
         """Event callback for save a level as a new file"""
         if self.master.index("current") != 0:
             return
         self.view_list[self.tilemap_panel.index("current")].save_to_file(None)
 
-    def _edit_default_spawn(self, event=None):
+    @Decorators.hidden_event
+    def _edit_default_spawn(self):
         """Event callback for setting the default spawn of the currently open level"""
         input_data = self.view_list[self.tilemap_panel.index("current")].level.default_start
         data = NumberSetDialog(self.master.master, [{"Col": input_data[0], "Row": input_data[1]}]).result
         if data is not None:
             self.view_list[self.tilemap_panel.index("current")].level.default_start = [data[0]["Col"], data[0]["Row"]]
 
-    def new_view(self, event=None):
+    @Decorators.hidden_event
+    def new_view(self):
         """Create a new, blank view"""
         if self.master.index("current") != 0:
             return
@@ -806,7 +837,8 @@ class TilemapEditorWindow(tk.Frame):
         for i in self.view_list:
             i.redraw_view()
 
-    def _close_view(self, event=None):
+    @Decorators.hidden_event
+    def _close_view(self):
         # TODO: Make the close_view process a bit more sane
         """Event callback for closing the currently open view"""
         if self.master.index("current") != 0:
@@ -826,65 +858,95 @@ class TilemapEditorWindow(tk.Frame):
                 self.tilemap_panel.forget(event.x)
                 del self.view_list[event.x]
 
-    def _undo(self, event=None):
-        """Event callback for undoing"""
-        self.undo(self.tilemap_panel.index("current"))
+    def reload_view_size(self, index):
+        """Reloads the viewport size in the given view"""
+        if self.master.index("current") != 0:
+            return
+        self.view_list[index].set_border(not self.border_mode.get())
+        self.view_list[index].set_border(self.border_mode.get())
 
+    @Decorators.apply_to_current_view
     def undo(self, index):
         """Tell the tilemap at the given index to undo"""
         self.view_list[index].undo()
+        self.reload_view_size(index)
 
-    def _redo(self, event=None):
-        """Event callback for undoing"""
-        self.redo(self.tilemap_panel.index("current"))
-
+    @Decorators.apply_to_current_view
     def redo(self, index):
         """Tell the tilemap at the given index to redo"""
         self.view_list[index].redo()
+        self.reload_view_size(index)
+
+    @Decorators.apply_to_current_view
+    def change_tilemap_size(self, index):
+        """Open a dialog to change the size of the currently open tilemap"""
+        # Open the dialog
+        size_change = NumberSetDialog(self.master.master, [{"Left": 0}, {"Right": 0}, {"Up": 0}, {"Down": 0}]).result
+        if size_change is None:
+            return
+        try:
+            self.view_list[index].level.change_size(left=int(size_change[0]["Left"]),
+                                                    right=int(size_change[1]["Right"]),
+                                                    up=int(size_change[2]["Up"]),
+                                                    down=int(size_change[3]["Down"]))
+        except ValueError:
+            messagebox.showerror("Invalid Input", "Invalid Tilemap Size")
+
+        # Reload the view area
+        self.reload_view_size(index)
+        self.view_list[index].backup_state()
 
     @staticmethod
-    def unimplemented(self, event=None):
+    def unimplemented(event=None):
         """This function has not yet been implemented"""
         print("This feature has not yet been implemented")
 
-    def tool_callback(self, name=None, index=None, op=None):
+    @Decorators.callback
+    def tool_callback(self):
         """Set the mode of views to draw mode"""
         for i in self.view_list:
             i.set_mode(self.tool_mode.get())
 
-    def grid_mode_callback(self, name=None, index=None, op=None):
+    @Decorators.callback
+    def grid_mode_callback(self):
         """Set the grid visibility of the views"""
         for i in self.view_list:
             i.set_grid()
 
-    def border_mode_callback(self, name=None, index=None, op=None):
+    @Decorators.callback
+    def border_mode_callback(self):
         """Set the grid visibility of the views"""
         for i in self.view_list:
             i.set_border(self.border_mode.get())
 
-    def tile_id_callback(self, name=None, index=None, op=None):
-        """Callback to set the grid visibility of the views"""
+    @Decorators.callback
+    def tile_id_callback(self):
+        """Callback to set the selected tile among the views"""
         for i in self.view_list:
             i.set_id(self.tile_id.get())
 
-    def deco_id_callback(self, name=None, index=None, op=None):
-        """Callback to set the grid visibility of the views"""
+    @Decorators.callback
+    def deco_id_callback(self):
+        """Callback to set the current deco among the views"""
         for i in self.view_list:
             i.set_id(self.deco_id.get())
 
-    def keybind_draw_mode(self, event=None):
+    @Decorators.hidden_event
+    def keybind_draw_mode(self):
         """Callback for setting the editor to draw mode"""
         if self.master.index("current") != 0:
             return
         self.tool_mode.set(0)
 
-    def keybind_move_mode(self, event=None):
+    @Decorators.hidden_event
+    def keybind_move_mode(self):
         """Callback for setting the editor to move mode"""
         if self.master.index("current") != 0:
             return
         self.tool_mode.set(1)
 
-    def keybind_grid_mode(self, event=None):
+    @Decorators.hidden_event
+    def keybind_grid_mode(self):
         """Callback for setting the editor to draw mode"""
         if self.master.index("current") != 0:
             return
@@ -893,7 +955,8 @@ class TilemapEditorWindow(tk.Frame):
         else:
             self.grid_mode.set(0)
 
-    def keybind_border_mode(self, event=None):
+    @Decorators.hidden_event
+    def keybind_border_mode(self):
         """Callback for setting the editor to draw mode"""
         if self.master.index("current") != 0:
             return
@@ -903,7 +966,7 @@ class TilemapEditorWindow(tk.Frame):
             self.border_mode.set(0)
 
     def keybind_layer_mode(self, event):
-        """Callback for setting the layer"""
+        """Generic callback for setting the layer"""
         self.layer.set(int(event.char) - 5)
 
     def set_pane(self, pane, layer):
@@ -1982,6 +2045,57 @@ class Level:
         result.lightmap = self.lightmap.copy()
         result.loading_zones = self.loading_zones.copy()
         return result
+
+    def change_size(self, left=0, right=0, up=0, down=0):
+        """Changes the size of the level from the edges"""
+        # Check if the size changes were valid
+        if self.level_width + left + right < 18:
+            raise ValueError("Size changes leave behind invalid width")
+
+        if self.level_height + up + down < 11:
+            raise ValueError("Size changes leave behind invalid width")
+
+        if left != 0:
+            if left > 0:
+                for i, j in enumerate(self.tilemap):
+                    for k in range(left):
+                        self.tilemap[i].insert(0, 0)
+            else:
+                for i in self.tilemap:
+                    for k in range(abs(left)):
+                        i.pop(0)
+
+            self.level_width += left
+
+        if right != 0:
+            if right > 0:
+                for i, j in enumerate(self.tilemap):
+                    for k in range(right):
+                        self.tilemap[i].insert(-1, 0)
+            else:
+                for i in self.tilemap:
+                    for k in range(abs(right)):
+                        i.pop(-1)
+
+            self.level_width += right
+
+        if up != 0:
+            if up > 0:
+                for i in range(up):
+                    self.tilemap.insert(0, [0] * self.level_width)
+            else:
+                for i in range(abs(up)):
+                    self.tilemap.pop(0)
+            self.level_height += up
+
+        if down != 0:
+            if down > 0:
+                for i in range(down):
+                    self.tilemap.append([0] * self.level_width)
+            else:
+                for i in range(abs(down)):
+                    self.tilemap.pop(-1)
+            self.level_height += down
 
     def jsonify(self):
         """Convert the level to a JSON representation"""
