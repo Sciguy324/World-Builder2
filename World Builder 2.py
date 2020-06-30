@@ -1493,30 +1493,29 @@ class TilemapView(tk.Frame):
                 self.canvas.unbind(i)
             # Tilemap mode
             if self.master.master.layer.get() == 0:
-                #self.canvas.bind("<ButtonPress-1>", self.draw_tile)
                 self.canvas.bind("<B1-Motion>", self.draw_tile)
                 self.canvas.bind("<ButtonRelease-1>", lambda event: self._draw_with_object(event, self.draw_tile))
                 self.canvas.bind("<ButtonPress-1>", lambda event: self._draw_with_object(event, self.draw_tile))
             # Decomap mode
             elif self.master.master.layer.get() == 1:
-                self.canvas.bind("<ButtonPress-1>", self.draw_deco)
                 self.canvas.bind("<B1-Motion>", self.draw_deco)
                 self.canvas.bind("<ButtonRelease-1>", lambda event: self._draw_with_object(event, self.draw_deco))
+                self.canvas.bind("<ButtonPress-1>", lambda event: self._draw_with_object(event, self.draw_deco))
             # Collision map mode
             elif self.master.master.layer.get() == 2:
-                self.canvas.bind("<ButtonPress-1>", self.draw_collider)
                 self.canvas.bind("<B1-Motion>", self.draw_collider)
                 self.canvas.bind("<ButtonRelease-1>", lambda event: self._draw_with_object(event, self.draw_collider))
+                self.canvas.bind("<ButtonPress-1>", lambda event: self._draw_with_object(event, self.draw_collider))
             # Loading zone mode
             elif self.master.master.layer.get() == 3:
-                self.canvas.bind("<ButtonPress-1>", self.draw_zone)
                 self.canvas.bind("<B1-Motion>", self.draw_zone)
                 self.canvas.bind("<ButtonRelease-1>", lambda event: self._draw_with_object(event, self.draw_zone))
+                self.canvas.bind("<ButtonPress-1>", lambda event: self._draw_with_object(event, self.draw_zone))
             # Lightmap mode
             elif self.master.master.layer.get() == 4:
-                self.canvas.bind("<ButtonPress-1>", self.draw_light)
                 self.canvas.bind("<B1-Motion>", self.draw_light)
                 self.canvas.bind("<ButtonRelease-1>", lambda event: self._draw_with_object(event, self.draw_light))
+                self.canvas.bind("<ButtonPress-1>", lambda event: self._draw_with_object(event, self.draw_light))
             self.canvas.config(cursor="pencil")
         elif value == 1:
             # Movement controls
