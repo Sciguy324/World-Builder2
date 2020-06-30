@@ -613,13 +613,13 @@
     {
       "id": 29,
       "tex": "tree_mid_left.png",
-      "height": 2,
+      "height": 3,
       "geo": [0, 0, 0, 0]
     },
     {
       "id": 28,
       "tex": "tree_top_right.png",
-      "height": 3,
+      "height": 2,
       "geo": [0, 0, 0, 0]
     },
     {

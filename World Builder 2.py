@@ -1302,14 +1302,14 @@ class TilemapEditorWindow(tk.Frame):
                 for i in file_data["tile_ids"]:
                     img = Image.open("tiles/" + i["tex"])
                     img = img.crop([0, 0, 16, 16])
-                    img = img.resize((64, 64))
+                    img = img.resize((64, 64), Image.NORMAL)
                     cls.tile_dict[int(i["id"])] = ImageTk.PhotoImage(img)
 
                 # Load the decos
                 for i in file_data["deco_ids"]:
                     img = Image.open("tiles/" + i["tex"])
                     img = img.crop([0, 0, 16, 16])
-                    img = img.resize((64, 64))
+                    img = img.resize((64, 64), Image.NORMAL)
                     cls.deco_dict[int(i["id"])] = ImageTk.PhotoImage(img)
 
         except FileNotFoundError:
@@ -1562,7 +1562,6 @@ class TilemapView(tk.Frame):
 
     def set_mode(self, value):
         """Does the actual work of setting the window's mode"""
-        # TODO: Fix bug where pressing the mouse button (w/o moving) does not draw anything.
         if value == 0:
             # Drawing controls
             for i in ["<ButtonPress-1>", "<B1-Motion>", "<ButtonRelease-1>"]:
@@ -1570,33 +1569,32 @@ class TilemapView(tk.Frame):
             # Tilemap mode
             if self.master.master.layer.get() == 0:
                 self.canvas.bind("<B1-Motion>", self.draw_tile)
-                self.canvas.bind("<ButtonRelease-1>", lambda event: self._draw_with_object(event, self.draw_tile))
-                self.canvas.bind("<ButtonPress-1>", lambda event: self._draw_with_object(event, self.draw_tile))
+                self.canvas.bind("<ButtonRelease-1>", lambda event: self._generic_finish_draw(event, self.draw_tile))
+                self.canvas.bind("<ButtonPress-1>", lambda event: self._generic_start_draw(event, self.draw_tile))
             # Decomap mode
             elif self.master.master.layer.get() == 1:
                 self.canvas.bind("<B1-Motion>", self.draw_deco)
-                self.canvas.bind("<ButtonRelease-1>", lambda event: self._draw_with_object(event, self.draw_deco))
-                self.canvas.bind("<ButtonPress-1>", lambda event: self._draw_with_object(event, self.draw_deco))
+                self.canvas.bind("<ButtonRelease-1>", lambda event: self._generic_finish_draw(event, self.draw_deco))
+                self.canvas.bind("<ButtonPress-1>", lambda event: self._generic_start_draw(event, self.draw_deco))
             # Collision map mode
             elif self.master.master.layer.get() == 2:
                 self.canvas.bind("<B1-Motion>", self.draw_collider)
-                self.canvas.bind("<ButtonRelease-1>", lambda event: self._draw_with_object(event, self.draw_collider))
-                self.canvas.bind("<ButtonPress-1>", lambda event: self._draw_with_object(event, self.draw_collider))
+                self.canvas.bind("<ButtonRelease-1>", lambda event: self._generic_finish_draw(event, self.draw_collider))
+                self.canvas.bind("<ButtonPress-1>", lambda event: self._generic_start_draw(event, self.draw_collider))
             # Height map mode
             elif self.master.master.layer.get() == 3:
-                #self.canvas.bind("<B1-Motion>", self.draw_height)
-                #self.canvas.bind("<ButtonRelease-1>", lambda event: self._draw_with_object(event, self.draw_height))
-                self.canvas.bind("<ButtonPress-1>", lambda event: self._draw_with_object(event, self.draw_height))
+                self.canvas.bind("<ButtonRelease-1>", lambda event: self.redraw_view())
+                self.canvas.bind("<ButtonPress-1>", lambda event: self._generic_start_draw(event, self.draw_height))
             # Loading zone mode
             elif self.master.master.layer.get() == 4:
                 self.canvas.bind("<B1-Motion>", self.draw_zone)
-                self.canvas.bind("<ButtonRelease-1>", lambda event: self._draw_with_object(event, self.draw_zone))
-                self.canvas.bind("<ButtonPress-1>", lambda event: self._draw_with_object(event, self.draw_zone))
+                self.canvas.bind("<ButtonRelease-1>", lambda event: self._generic_finish_draw(event, self.draw_zone))
+                self.canvas.bind("<ButtonPress-1>", lambda event: self._generic_start_draw(event, self.draw_zone))
             # Lightmap mode
             elif self.master.master.layer.get() == 5:
                 self.canvas.bind("<B1-Motion>", self.draw_light)
-                self.canvas.bind("<ButtonRelease-1>", lambda event: self._draw_with_object(event, self.draw_light))
-                self.canvas.bind("<ButtonPress-1>", lambda event: self._draw_with_object(event, self.draw_light))
+                self.canvas.bind("<ButtonRelease-1>", lambda event: self._generic_finish_draw(event, self.draw_light))
+                self.canvas.bind("<ButtonPress-1>", lambda event: self._generic_start_draw(event, self.draw_light))
             self.canvas.config(cursor="pencil")
         elif value == 1:
             # Movement controls
@@ -1606,12 +1604,15 @@ class TilemapView(tk.Frame):
             self.canvas.bind("<B1-Motion>", self.move)
             self.canvas.config(cursor="fleur")
 
-    def _draw_with_object(self, event, draw_function):
+    def _generic_start_draw(self, event, draw_function):
+        self.backup_state()
+        draw_function(event)
+
+    def _generic_finish_draw(self, event, draw_function):
         self.canvas.delete("all")
         self.backup_state()
         draw_function(event)
         self.redraw_view()
-        self.canvas.update()
 
     def set_grid(self):
         """Update the grid overlay"""
@@ -1789,7 +1790,7 @@ class TilemapView(tk.Frame):
         height_option = self.master.master.height_id.get()
         self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
                                  image=TilemapEditorWindow.height_dict[height_option])
-        print(height_option)
+        
         # Modify the height value in the ids list
         deco_id = self.level.decomap[tile_x, tile_y]
         # If there was actually a deco at the selected location
