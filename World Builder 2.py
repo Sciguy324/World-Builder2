@@ -383,7 +383,6 @@ class LightEditorDialog(Dialog):
 
 
 # TODO: Refactor ids list
-# TODO: Add collision geometry editor dialog
 # TODO: Add tile group editor dialog
 # TODO: Add tile assembly group editor dialog
 # TODO: Add tile assembly editor dialog
@@ -558,6 +557,7 @@ class TilemapEditorWindow(tk.Frame):
     tile_dict = {}
     deco_dict = {}
     collider_dict = {}
+    height_dict = {}
     loading_dict = {}
     light_dict = {}
     ids_data = {}
@@ -606,6 +606,7 @@ class TilemapEditorWindow(tk.Frame):
         self.panes = {"tile": {},
                       "deco": {},
                       "collision": {},
+                      "height": {},
                       "loading": {},
                       "light": {}}
 
@@ -638,6 +639,9 @@ class TilemapEditorWindow(tk.Frame):
         # Add the collision ID tracking variable
         self.collision_id = tk.IntVar(self, 0, "selected_collision")
 
+        # Add the collision ID tracking variable
+        self.height_id = tk.IntVar(self, 0, "selected_height")
+
         # Add the loading ID tracking variable
         self.loading_id = tk.IntVar(self, 0, "selected_loading")
 
@@ -646,6 +650,7 @@ class TilemapEditorWindow(tk.Frame):
 
         # Add the group tracking variable
         self.group = tk.StringVar(self, "", "selected_group")
+        # TODO: Should this line exist?
         self.group.trace("w", lambda name, index, op: self.set_pane(self.group.get(), self.layer.get()))
 
         # Add the selected layer tracking variable
@@ -676,27 +681,28 @@ class TilemapEditorWindow(tk.Frame):
         self.button_spacing1 = tk.Frame(self.buttons_bar, height=16, width=16)
         self.button_spacing1.grid(row=0, column=5, sticky=tk.NW)
 
-        # Add layer selection buttons (tile, deco, collision, loading, light)
-        for i, j in enumerate(["tile_layer", "deco_layer", "collider_layer", "loading_layer", "light_layer"]):
+        # Add layer selection buttons (tile, deco, collision, height, loading, light)
+        for i, j in enumerate(["tile_layer", "deco_layer", "collider_layer", "height_layer", "loading_layer",
+                               "light_layer"]):
             self.layer_button = tk.Radiobutton(self.buttons_bar, indicator=0, value=i, variable=self.layer,
                                                image=TilemapEditorWindow.imgs[j])
             self.layer_button.grid(row=0, column=i + 6, sticky=tk.NW)
 
         # Add another spacing
         self.button_spacing2 = tk.Frame(self.buttons_bar, height=16, width=16)
-        self.button_spacing2.grid(row=0, column=11, sticky=tk.NW)
+        self.button_spacing2.grid(row=0, column=12, sticky=tk.NW)
 
         # Add the tile coordinate label
         self.tile_coords_text = tk.StringVar(self, "Row, Col: ¯\\_(ツ)_/¯", "tile_coords_text")
         self.tile_coords = tk.Label(self.buttons_bar, textvariable=self.tile_coords_text,
                                     borderwidth=1, relief=tk.SUNKEN, padx=5, pady=5)
-        self.tile_coords.grid(row=0, column=12, sticky=tk.W)
+        self.tile_coords.grid(row=0, column=13, sticky=tk.W)
 
         # Add the level coordinate label
         self.level_coords_text = tk.StringVar(self, "X, Y: ¯\\_(ツ)_/¯", "level_coords_text")
         self.level_coords = tk.Label(self.buttons_bar, textvariable=self.level_coords_text,
                                      borderwidth=1, relief=tk.SUNKEN, padx=5, pady=5)
-        self.level_coords.grid(row=0, column=13, sticky=tk.W)
+        self.level_coords.grid(row=0, column=14, sticky=tk.W)
 
         # TODO: Find a more efficient way of limiting the scope of these keybindings
         # Set up tool keybindings
@@ -708,6 +714,7 @@ class TilemapEditorWindow(tk.Frame):
         # Set up the layer keybindings
         for i in range(5, 10):
             parent.master.bind("<Key-{}>".format(i), self.keybind_layer_mode)
+        parent.master.bind("<Key-0>", self.keybind_layer_mode)
 
         # Set up menubar keybindings
         parent.master.bind("<Control-o>", self._open_map)
@@ -967,7 +974,10 @@ class TilemapEditorWindow(tk.Frame):
 
     def keybind_layer_mode(self, event):
         """Generic callback for setting the layer"""
-        self.layer.set(int(event.char) - 5)
+        if int(event.char) == 0:
+            self.layer.set(5)
+        else:
+            self.layer.set(int(event.char) - 5)
 
     def set_pane(self, pane, layer):
         """Set the currently viewable pane"""
@@ -975,6 +985,7 @@ class TilemapEditorWindow(tk.Frame):
         for i, j in self.panes.items():
             for k, l in j.items():
                 l.pack_forget()
+
         self.group.set(pane)
         # Tilemap mode: select pane from the tile panes
         if layer == 0:
@@ -985,11 +996,14 @@ class TilemapEditorWindow(tk.Frame):
         # Collision mode: select the collision pane
         elif layer == 2:
             self.panes["collision"][pane].pack(anchor="ne")
-        # Loading zone mode: select the loading zone pane
+        # Height mode: select the height pane
         elif layer == 3:
+            self.panes["height"][pane].pack(anchor="ne")
+        # Loading zone mode: select the loading zone pane
+        elif layer == 4:
             self.panes["loading"][pane].pack(anchor="ne")
         # Lightmap mode: select the lightmap pane
-        elif layer == 4:
+        elif layer == 5:
             self.panes["light"][pane].pack(anchor="ne")
 
     def set_layer(self, layer):
@@ -1037,6 +1051,13 @@ class TilemapEditorWindow(tk.Frame):
                                                          self.collision_id,
                                                          borderwidth=1,
                                                          relief=tk.SUNKEN)}
+
+        self.panes["height"] = {"All": TileCollection(self.selection_frame,
+                                                      [0, 1],
+                                                      "height",
+                                                      self.height_id,
+                                                      borderwidth=1,
+                                                      relief=tk.SUNKEN)}
 
         self.panes["loading"] = {"All": TileCollection(self.selection_frame,
                                                        [0, 1, 2, 3, 4, 5],
@@ -1130,6 +1151,11 @@ class TilemapEditorWindow(tk.Frame):
             69zyNyvV7l99cXSFh4xxfnUgAAOw==
             '''
 
+        height_layer_data = '''R0lGODlhIAAgAIABAAAAAP///yH5BAEKAAEALAAAAAAgACAAA
+            AJRjI+pq+APo5xo2gsr3lLzDzCi\nI5ZlZqZHp5pWO15ws80Masdkrof8/fgBd8IErrg
+            KIj2+peG4hPI4QgzyFY04n8ptgNgCgZhiWbJs\nPaOx3kQBADs=
+            '''
+
         loading_layer_data = '''R0lGODlhIAAgAIABAAAAAP///yH5BAEKAAEALAAAAAAgACAA
             AAJrBBKGmtfrmIwU2ocZ2rz7v2ng\nSBoTiXZnynJi64kv7JoXDa44Ou+ys6vpPqaisX
             YjGpc5IG7YS9kaw9Y0VKFdldrXb1lUzcJU8HcU\nRaeDW/FzTZausVZnUGmu8vKTOdt+
@@ -1150,6 +1176,14 @@ class TilemapEditorWindow(tk.Frame):
         desolidify_data = '''R0lGODlhEAAQAKEDAKc+PtUyMv9DQ////yH5BAEKAAMALAAAAAA
             QABAAAAI7lC+DeuE+XohQSArf\nADbrz3kipUzXN3GY6UXDipFTOWYvHdu3lZv3m0C5f
             i/hjNiREXes4VKxAWyetwIAOw==
+            '''
+
+        elevate_data = '''R0lGODlhEAAQAKEAAADVAGPiYwDVAADVACH5BAEKAAIALAAAAAAQAB
+            AAAAIglI+pu+EPFZyBGWeR\nAyCLzXXME3Ke6Rloup4i+7rpTBcAOw==
+            '''
+
+        descend_data = '''R0lGODlhEAAQAKECAKYAAMUAAADVAADVACH5BAEKAAIALAAAAAAQAB
+            AAAAIhlI+pyxfR0otoUmNv\npnu9D4QNKEZBCFxCyaAuqryvSjMFADs=
             '''
 
         delete_zone = '''R0lGODlhEAAQAKEBAAAAAP8AAP9UVP8AACH5BAEKAAMALAAAAAAQABA
@@ -1200,11 +1234,14 @@ class TilemapEditorWindow(tk.Frame):
                     "tile_layer": tk.PhotoImage("img_tile_layer", data=tile_layer_data),
                     "deco_layer": tk.PhotoImage("img_deco_layer", data=deco_layer_data),
                     "collider_layer": tk.PhotoImage("img_collide_layer", data=collision_layer_data),
+                    "height_layer": tk.PhotoImage("img_height_layer", data=height_layer_data),
                     "loading_layer": tk.PhotoImage("img_load_layer", data=loading_layer_data),
                     "light_layer": tk.PhotoImage("img_light_layer", data=light_layer_data),
                     "delete": tk.PhotoImage("img_delete", data=delete_zone).zoom(64).subsample(16),
                     "solidify": tk.PhotoImage("img_solidify", data=solidify_data).zoom(64).subsample(16),
                     "desolidify": tk.PhotoImage("img_desolidify", data=desolidify_data).zoom(64).subsample(16),
+                    "elevate": tk.PhotoImage("img_elevate", data=elevate_data).zoom(64).subsample(16),
+                    "descend": tk.PhotoImage("img_descend", data=descend_data).zoom(64).subsample(16),
                     "new_zone": tk.PhotoImage("img_new_zone", data=new_zone).zoom(64).subsample(16),
                     "configure_zone": tk.PhotoImage("img_edit_zone", data=configure_zone).zoom(64).subsample(16),
                     "copy": tk.PhotoImage("img_copy", data=copy_zone).zoom(64).subsample(16),
@@ -1217,6 +1254,10 @@ class TilemapEditorWindow(tk.Frame):
         cls.collider_dict = [cls.imgs["desolidify"],
                              cls.imgs["solidify"]
                              ]
+
+        cls.height_dict = [cls.imgs["elevate"],
+                           cls.imgs["descend"]
+                           ]
 
         cls.loading_dict = [cls.imgs["delete"],
                             cls.imgs["new_zone"],
@@ -1368,6 +1409,27 @@ class TilemapView(tk.Frame):
         self.frame.forget()
         return True
 
+    def draw_grid(self):
+        """Draw the tilemap grid"""
+        for i in range(self.level.level_width + 1):
+            self.canvas.create_line(64 * i, 0, 64 * i, 64 * self.level.level_height, fill="BLACK", width=2.0)
+        for i in range(self.level.level_height + 1):
+            self.canvas.create_line(0, 64 * i, 64 * self.level.level_width, 64 * i, fill="BLACK", width=2.0)
+
+    def draw_tilemap(self):
+        """Draw the current level"""
+        for i, j in enumerate(self.level.tilemap):
+            for k, m in enumerate(j):
+                if m != 0:
+                    self.canvas.create_image((k * 64 + 32, i * 64 + 32), image=TilemapEditorWindow.tile_dict[m])
+
+    def draw_decomap(self):
+        """Draw the current level's decomap"""
+        self.level.decomap.sort()
+        for deco_id, x, y in self.level.decomap:
+            if deco_id != 0:
+                self.canvas.create_image((x * 64 + 32, y * 64 + 32), image=TilemapEditorWindow.deco_dict[deco_id])
+
     def draw_collision(self):
         """Draw the collision map"""
         self.apply_geometry()
@@ -1397,26 +1459,9 @@ class TilemapView(tk.Frame):
                                              width=1,
                                              stipple="gray50")
 
-    def draw_grid(self):
-        """Draw the tilemap grid"""
-        for i in range(self.level.level_width + 1):
-            self.canvas.create_line(64 * i, 0, 64 * i, 64 * self.level.level_height, fill="BLACK", width=2.0)
-        for i in range(self.level.level_height + 1):
-            self.canvas.create_line(0, 64 * i, 64 * self.level.level_width, 64 * i, fill="BLACK", width=2.0)
-
-    def draw_tilemap(self):
-        """Draw the current level"""
-        for i, j in enumerate(self.level.tilemap):
-            for k, m in enumerate(j):
-                if m != 0:
-                    self.canvas.create_image((k * 64 + 32, i * 64 + 32), image=TilemapEditorWindow.tile_dict[m])
-
-    def draw_decomap(self):
-        """Draw the current level's decomap"""
-        self.level.decomap.sort()
-        for deco_id, x, y in self.level.decomap:
-            if deco_id != 0:
-                self.canvas.create_image((x * 64 + 32, y * 64 + 32), image=TilemapEditorWindow.deco_dict[deco_id])
+    def draw_heightmap(self):
+        """Draw the current level's height map"""
+        pass
 
     def draw_loading_zones(self):
         """Draw the loading zones"""
@@ -1458,11 +1503,14 @@ class TilemapView(tk.Frame):
         # Draw collision layer if enabled
         if self.master.master.layer.get() == 2:
             self.draw_collision()
-        # Draw loading zones layer if enabled
+        # Draw height layer if enabled
         elif self.master.master.layer.get() == 3:
+            self.draw_heightmap()
+        # Draw loading zones layer if enabled
+        elif self.master.master.layer.get() == 4:
             self.draw_loading_zones()
         # Draw lightmap layer if enabled
-        elif self.master.master.layer.get() == 4:
+        elif self.master.master.layer.get() == 5:
             self.draw_lights()
 
         # Redraw the grid if enabled (self.master.master.grid_mode.get()=1)
@@ -1506,13 +1554,18 @@ class TilemapView(tk.Frame):
                 self.canvas.bind("<B1-Motion>", self.draw_collider)
                 self.canvas.bind("<ButtonRelease-1>", lambda event: self._draw_with_object(event, self.draw_collider))
                 self.canvas.bind("<ButtonPress-1>", lambda event: self._draw_with_object(event, self.draw_collider))
-            # Loading zone mode
+            # Height map mode
             elif self.master.master.layer.get() == 3:
+                self.canvas.bind("<B1-Motion>", self.draw_height)
+                self.canvas.bind("<ButtonRelease-1>", lambda event: self._draw_with_object(event, self.draw_height))
+                self.canvas.bind("<ButtonPress-1>", lambda event: self._draw_with_object(event, self.draw_height))
+            # Loading zone mode
+            elif self.master.master.layer.get() == 4:
                 self.canvas.bind("<B1-Motion>", self.draw_zone)
                 self.canvas.bind("<ButtonRelease-1>", lambda event: self._draw_with_object(event, self.draw_zone))
                 self.canvas.bind("<ButtonPress-1>", lambda event: self._draw_with_object(event, self.draw_zone))
             # Lightmap mode
-            elif self.master.master.layer.get() == 4:
+            elif self.master.master.layer.get() == 5:
                 self.canvas.bind("<B1-Motion>", self.draw_light)
                 self.canvas.bind("<ButtonRelease-1>", lambda event: self._draw_with_object(event, self.draw_light))
                 self.canvas.bind("<ButtonPress-1>", lambda event: self._draw_with_object(event, self.draw_light))
@@ -1691,6 +1744,10 @@ class TilemapView(tk.Frame):
             self.level.collider[tile_y][tile_x] = solid_state
         except IndexError:
             pass
+
+    def draw_height(self, event):
+        """Event callback for drawing heights"""
+        pass
 
     def draw_zone(self, event):
         """Event callback for editing loading zones"""
@@ -2499,13 +2556,15 @@ class TileCollection(TilePane):
             image_dict = TilemapEditorWindow.deco_dict
         elif mode == "collision":
             image_dict = TilemapEditorWindow.collider_dict
+        elif mode == "height":
+            image_dict = TilemapEditorWindow.height_dict
         elif mode == "loading":
             image_dict = TilemapEditorWindow.loading_dict
         elif mode == "light":
             image_dict = TilemapEditorWindow.light_dict
         else:
             raise ValueError("Cannot initialize TileCollection with unknown mode '{}'."
-                             "  Options are 'tile,' 'deco,' 'collision,' 'loading' and 'light'".format(mode))
+                             "  Options are 'tile,' 'deco,' 'collision,' 'height,' 'loading' and 'light'".format(mode))
 
         # TODO: Add a configuration option for changing the width of the pane
         # Iterate through group to declare tile images in a HEIGHT x 3 grid
