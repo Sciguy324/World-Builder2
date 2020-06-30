@@ -634,7 +634,7 @@ class TilemapEditorWindow(tk.Frame):
         self.deco_id.trace("w", self.deco_id_callback)
 
         # NOTE: Wait, what?  I cannot remember for the life of me why these something_id_callback functions are needed,
-        # but tile and deco drawing breaks completely without them.
+        # but drawing breaks completely without them.
         # Add the collision ID tracking variable
         self.collision_id = tk.IntVar(self, 0, "selected_collision")
 
@@ -2059,10 +2059,20 @@ class Level:
                 for i, j in enumerate(self.tilemap):
                     for k in range(left):
                         self.tilemap[i].insert(0, 0)
+
+                for i, j in enumerate(self.collider):
+                    for k in range(left):
+                        self.collider[i].insert(0, 0)
+                        self.collider[i].insert(0, 0)
             else:
-                for i in self.tilemap:
+                for i, j in enumerate(self.tilemap):
                     for k in range(abs(left)):
-                        i.pop(0)
+                        j.pop(0)
+
+                for i, j in enumerate(self.collider):
+                    for k in range(abs(left)):
+                        self.collider[i].pop(0)
+                        self.collider[i].pop(0)
 
             self.level_width += left
 
@@ -2071,10 +2081,17 @@ class Level:
                 for i, j in enumerate(self.tilemap):
                     for k in range(right):
                         self.tilemap[i].insert(-1, 0)
+                for i, j in enumerate(self.collider):
+                    for k in range(right):
+                        self.collider[i].insert(-1, 0)
+                        self.collider[i].insert(-1, 0)
             else:
                 for i in self.tilemap:
                     for k in range(abs(right)):
                         i.pop(-1)
+                for i in self.collider:
+                    i.pop(-1)
+                    i.pop(-1)
 
             self.level_width += right
 
@@ -2082,18 +2099,26 @@ class Level:
             if up > 0:
                 for i in range(up):
                     self.tilemap.insert(0, [0] * self.level_width)
+                    self.collider.insert(0, [0] * self.level_width * 2)
+                    self.collider.insert(0, [0] * self.level_width * 2)
             else:
                 for i in range(abs(up)):
                     self.tilemap.pop(0)
+                    self.collider.pop(0)
+                    self.collider.pop(0)
             self.level_height += up
 
         if down != 0:
             if down > 0:
                 for i in range(down):
                     self.tilemap.append([0] * self.level_width)
+                    self.collider.append([0] * self.level_width*2)
+                    self.collider.append([0] * self.level_width*2)
             else:
                 for i in range(abs(down)):
                     self.tilemap.pop(-1)
+                    self.collider.pop(-1)
+                    self.collider.pop(-1)
             self.level_height += down
 
     def jsonify(self):
