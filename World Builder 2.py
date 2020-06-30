@@ -1053,7 +1053,7 @@ class TilemapEditorWindow(tk.Frame):
                                                          relief=tk.SUNKEN)}
 
         self.panes["height"] = {"All": TileCollection(self.selection_frame,
-                                                      [0, 1],
+                                                      [0, 1, 2, 3],
                                                       "height",
                                                       self.height_id,
                                                       borderwidth=1,
@@ -1186,6 +1186,19 @@ class TilemapEditorWindow(tk.Frame):
             AAAAIhlI+pyxfR0otoUmNv\npnu9D4QNKEZBCFxCyaAuqryvSjMFADs=
             '''
 
+        elevate_fast_data = '''R0lGODlhEAAQAKECAADVAGPiY////////yH5BAEKAAIALAAAA
+            AAQABAAAAIllI+pu+EPFZyBGWeR\nAyCLzXXME3Ke6RlouoZMm7VrMgvieadHAQA7
+            '''
+
+        descend_fast_data = '''R0lGODlhEAAQAKECAKYAAMUAAP///////yH5BAEKAAIALAAAA
+            AAQABAAAAImlI+pG73iTHhyVqvi\nwUnrzFFQCDYBgFImCogQ6xopxdZwYtvxLhYAOw=
+            =
+            '''
+
+        height_blank_data = '''R0lGODlhEAAQAIABAP+gAP///yH5BAEKAAEALAAAAAAQABAAA
+            AIeBBKGmocP45J0uRov3lVzxk3h\nCHkbGJrkuRoOAzsFADs=
+            '''
+
         delete_zone = '''R0lGODlhEAAQAKEBAAAAAP8AAP9UVP8AACH5BAEKAAMALAAAAAAQABA
             AAAI5TDaGmocP40IASGoV\nCDbu7nyQKJFk4nFn4wlCBzkP4MLX8K0yzlH9Evr5YIfVc
             GRDom4Sg4MBdRQAADs=
@@ -1242,6 +1255,9 @@ class TilemapEditorWindow(tk.Frame):
                     "desolidify": tk.PhotoImage("img_desolidify", data=desolidify_data).zoom(64).subsample(16),
                     "elevate": tk.PhotoImage("img_elevate", data=elevate_data).zoom(64).subsample(16),
                     "descend": tk.PhotoImage("img_descend", data=descend_data).zoom(64).subsample(16),
+                    "elevate_fast": tk.PhotoImage("img_descend_fast", data=elevate_fast_data).zoom(64).subsample(16),
+                    "descend_fast": tk.PhotoImage("img_descend_fast", data=descend_fast_data).zoom(64).subsample(16),
+                    "height_blank": tk.PhotoImage("img_height_blank", data=height_blank_data).zoom(64).subsample(16),
                     "new_zone": tk.PhotoImage("img_new_zone", data=new_zone).zoom(64).subsample(16),
                     "configure_zone": tk.PhotoImage("img_edit_zone", data=configure_zone).zoom(64).subsample(16),
                     "copy": tk.PhotoImage("img_copy", data=copy_zone).zoom(64).subsample(16),
@@ -1256,7 +1272,9 @@ class TilemapEditorWindow(tk.Frame):
                              ]
 
         cls.height_dict = [cls.imgs["elevate"],
-                           cls.imgs["descend"]
+                           cls.imgs["elevate_fast"],
+                           cls.imgs["descend"],
+                           cls.imgs["descend_fast"]
                            ]
 
         cls.loading_dict = [cls.imgs["delete"],
@@ -1459,9 +1477,18 @@ class TilemapView(tk.Frame):
                                              width=1,
                                              stipple="gray50")
 
-    def draw_heightmap(self):
+    def draw_height_map(self):
         """Draw the current level's height map"""
-        pass
+        for deco_id, x, y in self.level.decomap:
+            if deco_id != 0:
+                #self.canvas.create_image((x * 64 + 32, y * 64 + 32), image=TilemapEditorWindow.imgs["height_blank"])
+                self.canvas.create_rectangle((x * 64, y * 64, x * 64 + 64, y * 64 + 64),
+                                             fill="orange",
+                                             outline="orange",
+                                             width=2,
+                                             stipple="gray50")
+                self.canvas.create_text((x * 64 + 32, y * 64 + 32), fill="Dark Red", font="Courier 30 bold",
+                                        text=str(TilemapEditorWindow.ids_data["deco_ids"][deco_id]["height"]))
 
     def draw_loading_zones(self):
         """Draw the loading zones"""
@@ -1505,7 +1532,7 @@ class TilemapView(tk.Frame):
             self.draw_collision()
         # Draw height layer if enabled
         elif self.master.master.layer.get() == 3:
-            self.draw_heightmap()
+            self.draw_height_map()
         # Draw loading zones layer if enabled
         elif self.master.master.layer.get() == 4:
             self.draw_loading_zones()
@@ -1535,6 +1562,7 @@ class TilemapView(tk.Frame):
 
     def set_mode(self, value):
         """Does the actual work of setting the window's mode"""
+        # TODO: Fix bug where pressing the mouse button (w/o moving) does not draw anything.
         if value == 0:
             # Drawing controls
             for i in ["<ButtonPress-1>", "<B1-Motion>", "<ButtonRelease-1>"]:
@@ -1556,8 +1584,8 @@ class TilemapView(tk.Frame):
                 self.canvas.bind("<ButtonPress-1>", lambda event: self._draw_with_object(event, self.draw_collider))
             # Height map mode
             elif self.master.master.layer.get() == 3:
-                self.canvas.bind("<B1-Motion>", self.draw_height)
-                self.canvas.bind("<ButtonRelease-1>", lambda event: self._draw_with_object(event, self.draw_height))
+                #self.canvas.bind("<B1-Motion>", self.draw_height)
+                #self.canvas.bind("<ButtonRelease-1>", lambda event: self._draw_with_object(event, self.draw_height))
                 self.canvas.bind("<ButtonPress-1>", lambda event: self._draw_with_object(event, self.draw_height))
             # Loading zone mode
             elif self.master.master.layer.get() == 4:
@@ -1583,6 +1611,7 @@ class TilemapView(tk.Frame):
         self.backup_state()
         draw_function(event)
         self.redraw_view()
+        self.canvas.update()
 
     def set_grid(self):
         """Update the grid overlay"""
@@ -1747,7 +1776,33 @@ class TilemapView(tk.Frame):
 
     def draw_height(self, event):
         """Event callback for drawing heights"""
-        pass
+        if not self.check_bounds(event):
+            return
+
+        # No longer saved
+        self.saved = False
+        self.update_title()
+
+        tile_x, tile_y = self.event_to_tile(event)
+
+        # Draw the tile
+        height_option = self.master.master.height_id.get()
+        self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
+                                 image=TilemapEditorWindow.height_dict[height_option])
+        print(height_option)
+        # Modify the height value in the ids list
+        deco_id = self.level.decomap[tile_x, tile_y]
+        # If there was actually a deco at the selected location
+        if deco_id is not None:
+            for i in deco_id:
+                if height_option == 0:
+                    TilemapEditorWindow.ids_data["deco_ids"][i[0]]["height"] += 1
+                elif height_option == 1:
+                    TilemapEditorWindow.ids_data["deco_ids"][i[0]]["height"] += 5
+                elif height_option == 2:
+                    TilemapEditorWindow.ids_data["deco_ids"][i[0]]["height"] -= 1
+                elif height_option == 3:
+                    TilemapEditorWindow.ids_data["deco_ids"][i[0]]["height"] -= 5
 
     def draw_zone(self, event):
         """Event callback for editing loading zones"""

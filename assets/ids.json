@@ -475,13 +475,13 @@
     {
       "id": 5,
       "tex": "roof_right_bottom.png",
-      "height": 1,
+      "height": 3,
       "geo": [0, 0, 0, 0]
     },
     {
       "id": 6,
       "tex": "roof_right_middle1.png",
-      "height": 1,
+      "height": 3,
       "geo": [0, 0, 0, 0]
     },
     {
@@ -493,19 +493,19 @@
     {
       "id": 8,
       "tex": "roof_right_top.png",
-      "height": 1,
+      "height": 3,
       "geo": [0, 0, 0, 0]
     },
     {
       "id": 9,
       "tex": "roof_left_bottom.png",
-      "height": 1,
+      "height": 3,
       "geo": [0, 0, 0, 0]
     },
     {
       "id": 10,
       "tex": "roof_left_middle1.png",
-      "height": 1,
+      "height": 3,
       "geo": [0, 0, 0, 0]
     },
     {
@@ -517,25 +517,25 @@
     {
       "id": 12,
       "tex": "roof_left_top.png",
-      "height": 1,
+      "height": 3,
       "geo": [0, 0, 0, 0]
     },
     {
       "id": 13,
       "tex": "roof_top1.png",
-      "height": 1,
+      "height": 3,
       "geo": [0, 0, 0, 0]
     },
     {
       "id": 14,
       "tex": "roof_top2.png",
-      "height": 1,
+      "height": 3,
       "geo": [0, 0, 0, 0]
     },
     {
       "id": 15,
       "tex": "top_roof_shadow.png",
-      "height": 1,
+      "height": 3,
       "geo": [0, 0, 0, 0]
     },
     {
@@ -589,13 +589,13 @@
     {
       "id": 24,
       "tex": "roof_right_edge.png",
-      "height": 4,
+      "height": 3,
       "geo": [0, 0, 0, 0]
     },
     {
       "id": 25,
       "tex": "roof_left_edge.png",
-      "height": 4,
+      "height": 3,
       "geo": [0, 0, 0, 0]
     },
     {
