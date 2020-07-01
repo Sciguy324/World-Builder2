@@ -1,7 +1,7 @@
 Core Features:
 	--Tilemap editing window
 	--Tile groups
-	-Tile assemblies
+	-Tile assemblies?
 	--Have multiple tilemaps open at once
 	-World map window
 	--Opening/saving files in .json format that is compliant with engine
@@ -34,7 +34,7 @@ Core Feature Elaboration:
 				--New "TileGroup" class for panels
 			--Hard-coded group of "All" tiles
 		
-		-Tile assemblies:
+		-Tile assemblies:?
 			-These are multi-tile objects that allow one to place structures quickly—like trees, for example
 			-Allows you to configure the height-value of decos
 			-The will have their own panel and collections

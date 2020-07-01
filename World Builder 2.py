@@ -4,6 +4,7 @@ import tkinter.filedialog as filedialog
 from tkinter import ttk
 from PIL import ImageTk, Image
 from os import path
+from os import getcwd
 import json
 import re
 
@@ -574,6 +575,18 @@ class GroupEditorDialog(Dialog):
             result[group_name] = tile_set
         self.result = result
 
+    def cancel(self, event=None):
+        """Function to handle closing the window."""
+        # Clear the group panes from memory
+        names = [i for i, j in self.group_panes.items()]
+        for name in names:
+            self.group_panes[name].destroy()
+            del self.group_panes[name]
+
+        # Return to the parent window and destroy this one
+        self.parent.focus_set()
+        self.destroy()
+
 
 class GroupEditorGroup(tk.Frame):
     """A class for group panes specifically for the GroupEditorDialog class"""
@@ -1053,6 +1066,9 @@ class TilemapEditorWindow(tk.Frame):
         self.tilemenu = tk.Menu(self.menubar, tearoff=0)
         self.tilemenu.add_command(label="Edit Tile Groups", command=self.edit_tile_groups)
         self.tilemenu.add_command(label="Edit Deco Groups", command=self.edit_deco_groups)
+        self.tilemenu.add_separator()
+        self.tilemenu.add_command(label="Import Tile", command=lambda: self.import_tile('tile'))
+        self.tilemenu.add_command(label="Import Deco", command=lambda: self.import_tile('deco'))
         self.menubar.add_cascade(label="Tile", menu=self.tilemenu)
 
         # Create the assembly menubar
@@ -1128,15 +1144,20 @@ class TilemapEditorWindow(tk.Frame):
 
     def close_view(self, event):
         """Close the currently open view"""
-        # Index of view in question passed as x-coordinate of event
         # Check with the view if it wants to close
         if type(event) == int:
+            # Index of the view in question passed in directly
             if self.view_list[event].close():
+                # Attempt to close view was not interrupted by user (such as by clicking "cancel" in an unsaved view)
                 self.tilemap_panel.forget(event)
+                self.view_list[event].destroy()
                 del self.view_list[event]
         else:
+            # Index of the view in question passed in as x-coordinate of event
             if self.view_list[event.x].close():
+                # Attempt to close view was not interrupted by user
                 self.tilemap_panel.forget(event.x)
+                self.view_list[event.x].destroy()
                 del self.view_list[event.x]
 
     def reload_view_size(self, index):
@@ -1177,8 +1198,8 @@ class TilemapEditorWindow(tk.Frame):
         self.reload_view_size(index)
         self.view_list[index].backup_state()
 
-    @Decorators.apply_to_current_view
-    def edit_tile_groups(self, index):
+    @Decorators.hidden_event
+    def edit_tile_groups(self):
         """Open a dialog to edit the tile groups"""
         # Open the dialog
         result = GroupEditorDialog(self, TilemapEditorWindow.tile_dict,
@@ -1187,8 +1208,8 @@ class TilemapEditorWindow(tk.Frame):
             TilemapEditorWindow.project_data["groups"]["tile"] = result
             self.reload_groups()
 
-    @Decorators.apply_to_current_view
-    def edit_deco_groups(self, index):
+    @Decorators.hidden_event
+    def edit_deco_groups(self):
         """Open a dialog to edit the deco groups"""
         # Open the dialog
         result = GroupEditorDialog(self, TilemapEditorWindow.deco_dict,
@@ -1196,6 +1217,43 @@ class TilemapEditorWindow(tk.Frame):
         if result is not None:
             TilemapEditorWindow.project_data["groups"]["deco"] = result
             self.reload_groups()
+
+    def import_tile(self, mode):
+        """Import a tile"""
+        # Verify mode
+        if mode not in ["tile", "deco"]:
+            raise ValueError(f'\'{mode}\' is not a valid mode.  Valid modes are \'tile\' and \'deco\'')
+
+        # Open import dialog
+        file = filedialog.askopenfile(filetypes=[('PNG File', '*.png')],
+                                      defaultextension=[('PNG File', '*.png')])
+
+        # User did, in fact, import a tile
+        if file is not None:
+            current_directory = getcwd().replace('\\', '/')
+            file_path, tile_name = path.split(file.name)
+            file.close()
+            # If the tile is NOT already in the tile folder, save it there
+            if current_directory + '/tiles' != file_path:
+                print("Saving file to tile folder")
+                with open(f'{file_path}/{tile_name}', mode='rb') as rf:
+                    with open(f'tiles/{tile_name}', mode='wb') as wf:
+                        wf.write(rf.read())
+            else:
+                print("Tile was already in tile folder")
+
+            # Open the image
+            img = Image.open(path.join(file_path, tile_name))
+            img = img.crop([0, 0, 16, 16])
+            img = img.resize((64, 64), Image.NORMAL)
+            # Update the image registries
+            next_id = max(TilemapEditorWindow.tile_dict.keys()) + 1
+            TilemapEditorWindow.tile_dict[next_id] = ImageTk.PhotoImage(img)
+            TilemapEditorWindow.ids_data[f'{mode}_ids'].append({"id": next_id, "tex": tile_name, "geo": [0, 0, 0, 0]})
+            # Update the default pane
+            self.panes[mode]["All"].add_option(next_id, mode)
+
+            print(f'Imported {tile_name} from {file_path}')
 
     @staticmethod
     def unimplemented(event=None):
@@ -1384,7 +1442,7 @@ class TilemapEditorWindow(tk.Frame):
                     print(f'{name}, ({group_type}) - {tiles}')
                 self.add_pane(name, group_type, tiles)
 
-    def reload_groups(self, modified=None):
+    def reload_groups(self):
         """Tile panes from the TilemapEditorWindow.project_data["groups"] dictionary"""
         # Unload tile panes
         for name, pane in self.panes["tile"].copy().items():
@@ -2912,6 +2970,9 @@ class TilePane(SelectionPane):
         # Configure new radiobutton
         self.canvas.create_window(self.current_x * 72 + 36, self.current_y * 72 + 36, window=radiobutton)
         self.current_x += 1
+
+        # Configure scroll-region
+        self.canvas.config(scrollregion=self.canvas.bbox("all"))
 
 
 class TileCollection(TilePane):
