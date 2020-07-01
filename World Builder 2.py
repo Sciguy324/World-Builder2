@@ -2,7 +2,7 @@ import tkinter as tk
 import tkinter.messagebox as messagebox
 import tkinter.filedialog as filedialog
 from tkinter import ttk
-from PIL import ImageTk, Image, ImageDraw
+from PIL import ImageTk, Image
 from os import path
 from os import getcwd
 import json
