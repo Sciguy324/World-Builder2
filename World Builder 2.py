@@ -2,7 +2,7 @@ import tkinter as tk
 import tkinter.messagebox as messagebox
 import tkinter.filedialog as filedialog
 from tkinter import ttk
-from PIL import ImageTk, Image
+from PIL import ImageTk, Image, ImageDraw
 from os import path
 from os import getcwd
 import json
@@ -868,6 +868,8 @@ class TilemapEditorWindow(tk.Frame):
     imgs = {}
     tile_dict = {}
     deco_dict = {}
+    mini_tile_dict = {}
+    mini_deco_dict = {}
     collider_dict = {}
     height_dict = {}
     loading_dict = {}
@@ -1659,14 +1661,18 @@ class TilemapEditorWindow(tk.Frame):
                 for i in file_data["tile_ids"]:
                     img = Image.open("tiles/" + i["tex"])
                     img = img.crop([0, 0, 16, 16])
+                    mini_img = img.resize((8, 8), Image.NORMAL)
                     img = img.resize((64, 64), Image.NORMAL)
+                    cls.mini_tile_dict[int(i["id"])] = mini_img
                     cls.tile_dict[int(i["id"])] = ImageTk.PhotoImage(img)
 
                 # Load the decos
                 for i in file_data["deco_ids"]:
                     img = Image.open("tiles/" + i["tex"])
                     img = img.crop([0, 0, 16, 16])
+                    mini_img = img.resize((8, 8), Image.NORMAL)
                     img = img.resize((64, 64), Image.NORMAL)
+                    cls.mini_deco_dict[int(i["id"])] = mini_img
                     cls.deco_dict[int(i["id"])] = ImageTk.PhotoImage(img)
 
         except FileNotFoundError:
@@ -1735,6 +1741,8 @@ class TilemapView(tk.Frame):
         self.canvas.xview(tk.MOVETO, 0.0)
         self.canvas.yview(tk.MOVETO, 0.0)
 
+        self.image_view = Image.new('RGBA', (8*16, 8*9))
+
         # Add the view to the parent frame
         parent.add(self.frame)
         self.update_title()
@@ -1791,19 +1799,31 @@ class TilemapView(tk.Frame):
         for i in range(self.level.level_height + 1):
             self.canvas.create_line(0, 64 * i, 64 * self.level.level_width, 64 * i, fill="BLACK", width=2.0)
 
-    def draw_tilemap(self):
+    def draw_tilemap(self, update_minimap=False):
         """Draw the current level"""
         for i, j in enumerate(self.level.tilemap):
             for k, m in enumerate(j):
                 if m != 0:
                     self.canvas.create_image((k * 64 + 32, i * 64 + 32), image=TilemapEditorWindow.tile_dict[m])
+                    if update_minimap:
+                        if TilemapEditorWindow.mini_tile_dict[m].mode == 'RGBA':
+                            self.image_view.paste(TilemapEditorWindow.mini_tile_dict[m], box=(k * 8, i * 8),
+                                                  mask=TilemapEditorWindow.mini_tile_dict[m])
+                        else:
+                            self.image_view.paste(TilemapEditorWindow.mini_tile_dict[m], box=(k * 8, i * 8))
 
-    def draw_decomap(self):
+    def draw_decomap(self, update_minimap=False):
         """Draw the current level's decomap"""
         self.level.decomap.sort()
         for deco_id, x, y in self.level.decomap:
             if deco_id != 0:
                 self.canvas.create_image((x * 64 + 32, y * 64 + 32), image=TilemapEditorWindow.deco_dict[deco_id])
+                if update_minimap:
+                    if TilemapEditorWindow.mini_deco_dict[deco_id].mode == 'RGBA':
+                        self.image_view.paste(TilemapEditorWindow.mini_deco_dict[deco_id], box=(x * 8, y * 8),
+                                              mask=TilemapEditorWindow.mini_deco_dict[deco_id])
+                    else:
+                        self.image_view.paste(TilemapEditorWindow.mini_deco_dict[deco_id], box=(x * 8, y * 8))
 
     def draw_collision(self):
         """Draw the collision map"""
@@ -1876,12 +1896,17 @@ class TilemapView(tk.Frame):
             self.canvas.create_image((32, i * 64 + 32), image=TilemapView.imgs["border"])
             self.canvas.create_image((self.level.level_width * 64 - 32, i * 64 + 32), image=TilemapView.imgs["border"])
 
-    def redraw_view(self):
+    def redraw_view(self, update_minimap=False):
         """Redraw the entire view"""
         # Redraw basic map
         self.canvas.delete("all")
-        self.draw_tilemap()
-        self.draw_decomap()
+
+        if update_minimap:
+            del self.image_view
+            self.image_view = Image.new('RGBA', (8 * self.level.level_width, 8 * self.level.level_height))
+
+        self.draw_tilemap(update_minimap)
+        self.draw_decomap(update_minimap)
 
         # Draw layer-specific stuff (self.master.master.layer.get())
         # Draw collision layer if enabled
@@ -2378,9 +2403,9 @@ class TilemapView(tk.Frame):
         if file is None:
             file = filedialog.asksaveasfilename(filetypes=[('JSON File', '*.json')],
                                                 defaultextension=[('JSON File', '*.json')])
-            # User canceled saving, exit function
             print("File: ", file)
             if file == "":
+                # User canceled saving, exit function
                 return
 
             # Record path
@@ -2394,6 +2419,10 @@ class TilemapView(tk.Frame):
             f.write(self.level.jsonify())
         self.saved = True
         self.update_title()
+
+        # Save a screenshot of the entire file
+        self.redraw_view(True)
+        self.image_view.save(f'temp/{self.level.name}.png')
 
     def backup_state(self):
         """Save a backup of the current level state"""
@@ -2475,6 +2504,7 @@ class Level:
 
     def __init__(self):
         self.name = "Untitled"
+        self.world_pos = [0, 0]
         self.level_width = 16 + 2
         self.level_height = 9 + 2
         self.tilemap = [[0] * self.level_width for i in range(self.level_height)]
@@ -2519,6 +2549,7 @@ class Level:
             blue = ColorFade(i["blue"]["amplitude"], i["blue"]["inner_diameter"], i["blue"]["outer_diameter"])
             self.lightmap[i["pos"][0], i["pos"][1]] = Light(i["diameter"], red, green, blue, i["blacklight"], True)
         self.default_start = data["spawn"]
+        self.world_pos = data["world_pos"]
         self.name = data["name"]
 
     def copy(self):
@@ -2621,6 +2652,7 @@ class Level:
                              "loading_zones": self.loading_zones.jsonify(),
                              "lightmap": self.lightmap.jsonify(),
                              "spawn": self.default_start,
+                             "world_pos": self.world_pos,
                              "name": self.name}, indent=2)
         # Format json string
         result = re.sub(r'\s+([0-9.\-]+),', r'\1, ', result)
@@ -3030,37 +3062,48 @@ class TileAssembly(SelectionPane):
         super().__init__(parent, **kw)
 
 
-class WorldEditorWindow:
+class WorldEditorWindow(tk.Frame):
 
-    def __init__(self, parent):
-        # Create the source frame
-        self.frame = tk.Frame(parent, borderwidth=1, relief=tk.SUNKEN)
-        self.frame.pack(fill=tk.BOTH, expand=1)
+    def __init__(self, parent, **kwargs):
+        super().__init__(**kwargs)
 
         # Create the canvas viewport
-        self.canvas = tk.Canvas(self.frame, bg="BLACK", bd=0)
+        self.canvas = tk.Canvas(self, bg="BLACK", bd=0)
         self.canvas.pack(fill=tk.BOTH, expand=1)
 
         # Add to parent frame
-        parent.add(self.frame, text="World Editor")
+        parent.add(self, text="World Editor")
 
 
-class NotesEditorWindow:
+class SpriteEditorWindow(tk.Frame):
 
-    def __init__(self, parent):
+    def __init__(self, parent, **kwargs):
+        # Initialize superclass
+        super().__init__(**kwargs)
+
+        # Create the canvas viewport
+        self.canvas = tk.Canvas(self, bg="WHITE", bd=0)
+        self.canvas.pack(fill=tk.BOTH, expand=1)
+
+        # Add to parent frame
+        parent.add(self, text="Sprite Editor")
+
+
+class NotesEditorWindow(tk.Frame):
+
+    def __init__(self, parent, **kwargs):
         # Create the source frame
-        self.frame = tk.Frame(parent, borderwidth=1, relief=tk.SUNKEN)
-        self.frame.pack(fill=tk.BOTH, expand=1)
+        super().__init__(**kwargs)
 
         # Create the text entry
-        self.textbox = tk.Text(self.frame, borderwidth=1, padx=10, pady=10, maxundo=10)
+        self.textbox = tk.Text(self, borderwidth=1, padx=10, pady=10, maxundo=10)
         self.textbox.pack(fill=tk.BOTH, expand=1)
         self.textbox.bind("<Control-z>", lambda event: self.undo_edit())
         self.textbox.bind("<Control-y>", lambda event: self.redo_edit())
         self.textbox.bind("<Control-BackSpace>", lambda event: self.delete_word())
 
         # Add to parent frame
-        parent.add(self.frame, text="Notes")
+        parent.add(self, text="Notes")
 
     def undo_edit(self):
         """Undo an edit"""
@@ -3100,8 +3143,9 @@ class App:
 
         # Create the various editing windows
         self.tilemap_editor = TilemapEditorWindow(self.source)
-        self.world_editor = WorldEditorWindow(self.source)
-        self.notepad = NotesEditorWindow(self.source)
+        self.world_editor = WorldEditorWindow(self.source, borderwidth=1, relief=tk.SUNKEN)
+        self.sprite_editor = SpriteEditorWindow(self.source, borderwidth=1, relief=tk.SUNKEN)
+        self.notepad = NotesEditorWindow(self.source, borderwidth=1, relief=tk.SUNKEN)
 
         self.source.pack(expand=1, fill="both")
 

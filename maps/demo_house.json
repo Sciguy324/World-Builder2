@@ -70,5 +70,6 @@
     }
   ],
   "spawn": [0, 0],
+  "world_pos": [0, 0],
   "name": "demo_house"
 }
