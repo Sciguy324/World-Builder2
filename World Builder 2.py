@@ -384,16 +384,310 @@ class LightEditorDialog(Dialog):
 
 class GroupEditorDialog(Dialog):
 
-    def __init__(self, id_list, groups):
-        pass
+    def __init__(self, parent, id_list, groups: dict, **kwargs):
+        # Declare variables related to body
+        self.button_frame = None
+        self.selected_group = None
+        self.group_option_menu = None
+        self.new_group_button = None
+        self.delete_group_button = None
+        self.content_frame = None
+        self.preview_frame = None
+        self.preview_canvas = None
+        self.preview_scrollbar = None
+        self.selection_frame = None
+        self.selection_canvas = None
+        self.selection_scrollbar = None
+        self.selected_tile = None
+        self.selection_translator = []
+        self.selection_height = 0
+
+        # Save data to variables
+        self.groups = dict((i, j.copy()) for i, j in groups.items())
+        self.group_panes = {}
+        self.id_list = id_list
+
+        super().__init__(parent, title="Edit Groups", **kwargs)
+
+        # Button to add a new group
+        # Button to remove an existing group
+        # Selection pane to select what tiles should be in the group
+        # Modification pane to modify the order of the tiles
+        # Returns a GroupModifierObject
+
+    def body(self):
+        """Create the dialog body"""
+        # Create a frame to house the buttons
+        self.button_frame = tk.Frame(self.frame)
+        self.button_frame.pack(anchor="nw")
+
+        # Set up string variable
+        self.selected_group = tk.StringVar(self)
+        self.selected_group.set("Select Group")
+        self.selected_group.trace_add('write', self.group_callback)
+
+        # Group dropdown list that excludes any group named "All"
+        group_names = [i for i, j in self.groups.items()]
+        self.group_option_menu = tk.OptionMenu(self.button_frame, self.selected_group, *group_names)
+        self.group_option_menu.grid(row=0, column=0, sticky=tk.W, padx=4)
+
+        # Add new group button
+        self.new_group_button = tk.Button(self.button_frame, text="New Group", command=self.add_group)
+        self.new_group_button.grid(row=0, column=1, sticky=tk.W, padx=4)
+
+        # Add delete group button
+        self.new_group_button = tk.Button(self.button_frame, text="Delete Group", command=self.delete_group)
+        self.new_group_button.grid(row=0, column=2, sticky=tk.W, padx=4)
+
+        self.content_frame = tk.Frame(self.frame)
+        self.content_frame.pack(anchor="nw")
+
+        # Add preview canvas
+        self.preview_frame = tk.Frame(self.content_frame)
+        self.preview_frame.grid(row=0, column=1, sticky=tk.NW, padx=4)
+
+        # Add all already defined groups
+        for i, j in self.groups.items():
+            self.group_panes[i] = GroupEditorGroup(self.preview_frame, j.copy())
+
+        # Add selection canvas
+        self.selection_frame = tk.Frame(self.content_frame)
+        self.selection_frame.grid(row=0, column=0, sticky=tk.NW, padx=4)
+
+        self.selection_canvas = tk.Canvas(self.selection_frame, width=16 * 64, height=5 * 64, bg="WHITE", bd=0)
+        self.selection_canvas.grid(row=0, column=0, sticky=tk.NW, padx=4)
+        self.selection_canvas.bind("<Button-1>", func=self.select_tile)
+        self.selected_tile = tk.IntVar(self, 0, "group_editor_selected_tile")
+
+        self.selection_scrollbar = tk.Scrollbar(self.selection_frame, orient=tk.VERTICAL,
+                                                command=self.selection_canvas.yview)
+        self.selection_scrollbar.grid(row=0, column=1, sticky=tk.NS, padx=4)
+        self.selection_scrollbar.activate("slider")
+
+        # Add content to selection canvas
+        self.selection_translator = []
+        x = 0
+        self.selection_height = 0
+        for i, j in self.id_list.items():
+            self.selection_canvas.create_image((64 * x + 32, 64 * self.selection_height + 32), image=j)
+            self.selection_translator.append(i)
+            x += 1
+            if x >= 16:
+                self.selection_height += 1
+                x = 0
+
+        self.selection_height += 1
+
+        # Activate the canvas scrollbars
+        self.selection_canvas.config(scrollregion=(0, 0, 64 * 16, 64 * self.selection_height),
+                                     yscrollcommand=self.selection_scrollbar.set)
+
+    def reload_dropdown_menu(self):
+        """Reload the dropdown menu"""
+        self.group_option_menu['menu'].delete(0, 'end')
+        for i, j in self.groups.items():
+            self.group_option_menu['menu'].add_command(label=i, command=tk._setit(self.selected_group, i))
+
+    def add_group(self, event=None):
+        """Add a new group to the selection"""
+        # Launch text dialogue to get the name of the new group
+        result = DataSetDialog(self, [{"Group Name": ""}], "New Group").result
+        if result is not None:
+            new_group_name = str(result[0]['Group Name'])
+            # Add the group to the list and create a new pane
+            self.groups[new_group_name] = [-1, -1, -1]
+            self.group_panes[new_group_name] = GroupEditorGroup(self.preview_frame)
+
+            # Update the dropdown menu
+            self.reload_dropdown_menu()
+
+            # Set the current group
+            self.selected_group.set(new_group_name)
+
+    def delete_group(self, event=None):
+        """Delete the currently open group"""
+        # Hide the currently visible group
+        for i, j in self.group_panes.items():
+            j.pack_forget()
+
+        # Remove the groups
+        group_name = self.selected_group.get()
+        self.group_panes[group_name].forget()
+        del self.group_panes[group_name]
+        del self.groups[group_name]
+
+        # Reload the dropdown menu
+        self.selected_group.set("Select Group")
+        self.reload_dropdown_menu()
+
+    def group_callback(self, name=None, index=None, op=None):
+        """Callback function for when the group changes"""
+        # Hide the currently visible group
+        for i, j in self.group_panes.items():
+            j.pack_forget()
+
+        # Show the current group
+        try:
+            self.group_panes[self.selected_group.get()].pack(anchor="nw")
+        except KeyError:
+            pass
+
+    def select_tile(self, event):
+        """Select the tile at the given event coordinates"""
+        # Obtain coordinates of the selected tile
+        tile_x = int(event.x / 64)
+        tile_y = int(self.selection_canvas.yview()[0] * self.selection_height + event.y / 64)
+
+        # Ensure selection is within bounds
+        if tile_x < 0 or tile_y < 0:
+            return
+        elif tile_x > 16 or tile_y > self.selection_height:
+            return
+
+        # Ensure selection is a valid tile
+        if tile_y * 16 + tile_x >= len(self.selection_translator):
+            self.selected_tile.set(-1)
+        else:
+            # Obtain the selected tile
+            self.selected_tile.set(self.selection_translator[tile_y * 16 + tile_x])
+
+        # Redraw the selection box
+        self.selection_canvas.delete("selection_box")
+        self.selection_canvas.create_rectangle((tile_x * 64, tile_y * 64, tile_x * 64 + 64, tile_y * 64 + 64),
+                                               fill="orange",
+                                               outline="orange",
+                                               width=2,
+                                               stipple="gray50",
+                                               tag="selection_box")
+
+        # Update the currently open group pane
+        if self.selected_group.get() != "Select Group":
+            self.group_panes[self.selected_group.get()].set_tile(self.selected_tile.get())
+
+    def apply(self):
+        """Apply the result, if applicable"""
+        result = {}
+        for group_name, pane in self.group_panes.items():
+            tile_set = pane.tiles.copy()
+            while len(tile_set) > 0 and tile_set[-1] == -1:
+                tile_set.pop(-1)
+            result[group_name] = tile_set
+        self.result = result
+
+
+class GroupEditorGroup(tk.Frame):
+    """A class for group panes specifically for the GroupEditorDialog class"""
+
+    def __init__(self, parent, tiles=None, **kwargs):
+        super().__init__(parent, **kwargs)
+
+        # Initialize the tile list
+        if tiles is None:
+            self.tiles = [-1] * (16*9)
+        else:
+            self.tiles = tiles
+
+        # Add the selected tile tracker variable
+        self.selected_index = tk.IntVar(self, -1)
+
+        # Construct the canvas
+        self.canvas = tk.Canvas(self, width=3 * 64, height=9 * 64, bg="WHITE", bd=0)
+        self.canvas.grid(row=0, column=0, sticky=tk.NW, padx=4)
+
+        self.scrollbar = tk.Scrollbar(self, orient=tk.VERTICAL, command=self.canvas.yview)
+        self.scrollbar.grid(row=0, column=1, sticky=tk.NS, padx=4)
+        self.scrollbar.activate("slider")
+
+        # Activate the canvas scrollbars
+        self.canvas.config(scrollregion=(0, 0, 64 * 16, 64 * 9),
+                           yscrollcommand=self.scrollbar.set)
+
+        # Add the selection binding
+        self.canvas.bind("<Button-1>", func=self.select_tile)
+
+        self.auto_size()
+        self.redraw()
+
+    def auto_size(self):
+        """Automatically resize the group list"""
+        # If the tile list is deemed to short, extend it.
+        if len(self.tiles) <= 3:
+            self.tiles += [-1] * 9
+        # If a tile is present near the end of the tile list, extend said list.
+        elif self.tiles[:-4:-1] != [-1, -1, -1]:
+            self.tiles += [-1] * 9
+            self.canvas.config(scrollregion=(0, 0, 64 * 16, 64 * (len(self.tiles) // 3)))
+
+    def redraw(self):
+        """Redraws the panel"""
+        self.canvas.delete("all")
+
+        # Draw the tiles
+        x = 0
+        y = 0
+        for i in self.tiles:
+            if i != -1:
+                self.canvas.create_image((64 * x + 32, 64 * y + 32), image=self.master.master.master.master.id_list[i])
+            x += 1
+            if x >= 3:
+                y += 1
+                x = 0
+
+        # Highlight the selected tile, if applicable
+        selected = self.selected_index.get()
+        if selected != -1:
+            tile_x = selected % 3
+            tile_y = selected // 3
+            self.canvas.create_rectangle((tile_x * 64, tile_y * 64, tile_x * 64 + 64, tile_y * 64 + 64),
+                                         fill="blue",
+                                         outline="blue",
+                                         width=2,
+                                         stipple="gray50",
+                                         tag="selection_box")
+
+    def set_tile(self, tile_id):
+        """Set the currently selected tile to the given tile id"""
+        if self.selected_index.get() != -1:
+            self.tiles[self.selected_index.get()] = tile_id
+            self.auto_size()
+            self.redraw()
+        else:
+            self.auto_size()
+
+    def select_tile(self, event):
+        """Highlights the tile the user just clicked on"""
+        height = len(self.tiles) // 3
+        # Obtain coordinates of the selected tile
+        tile_x = int(event.x / 64)
+        tile_y = int(self.canvas.yview()[0] * height + event.y / 64)
+
+        # Ensure selection is within bounds
+        if tile_x < 0 or tile_y < 0:
+            return
+        elif tile_x > 3 or tile_y > height:
+            return
+
+        # Ensure selection is a valid tile
+        if tile_y * 3 + tile_x >= len(self.tiles):
+            return
+
+        # Obtain the selected tile
+        self.selected_index.set(tile_y * 3 + tile_x)
+
+        # Redraw the selection box
+        self.canvas.delete("selection_box")
+        self.canvas.create_rectangle((tile_x * 64, tile_y * 64, tile_x * 64 + 64, tile_y * 64 + 64),
+                                     fill="blue",
+                                     outline="blue",
+                                     width=2,
+                                     stipple="gray50",
+                                     tag="selection_box")
 
 
 # TODO: Refactor ids list
-# TODO: Add tile group editor dialog
 # TODO: Add tile assembly group editor dialog
 # TODO: Add tile assembly editor dialog
 # TODO: Add pattern editor dialog
-
 
 class CustomButton(ttk.Button):
     """A ttk button that has special effects"""
@@ -566,6 +860,7 @@ class TilemapEditorWindow(tk.Frame):
     loading_dict = {}
     light_dict = {}
     ids_data = {}
+    project_data = {}
     __initialized = False
 
     class Decorators(object):
@@ -752,22 +1047,16 @@ class TilemapEditorWindow(tk.Frame):
         self.editmenu.add_command(label="Change Tilemap Size", command=self.change_tilemap_size)
         self.editmenu.add_separator()
         self.editmenu.add_command(label="Set Default Spawn", command=self._edit_default_spawn)
-        self.menubar.add_cascade(label="Edit", menu=self.editmenu, command=self.unimplemented)
+        self.menubar.add_cascade(label="Edit", menu=self.editmenu)
 
         # Create the tile menubar
         self.tilemenu = tk.Menu(self.menubar, tearoff=0)
-        self.tilemenu.add_command(label="Edit Tile Geometry", command=self.unimplemented)
-        self.tilemenu.add_command(label="Apply Tile Geometry", command=self.unimplemented)
-        self.tilemenu.add_separator()
-        self.tilemenu.add_command(label="Edit Tile Groups", command=self.unimplemented)
-        self.tilemenu.add_command(label="Edit Deco Groups", command=self.unimplemented)
+        self.tilemenu.add_command(label="Edit Tile Groups", command=self.edit_tile_groups)
+        self.tilemenu.add_command(label="Edit Deco Groups", command=self.edit_deco_groups)
         self.menubar.add_cascade(label="Tile", menu=self.tilemenu)
 
         # Create the assembly menubar
         self.assemblymenu = tk.Menu(self.menubar, tearoff=0)
-        self.assemblymenu.add_command(label="Edit Tile Geometries", command=self.unimplemented)
-        self.assemblymenu.add_command(label="Apply Tile Geometries", command=self.unimplemented)
-        self.assemblymenu.add_separator()
         self.assemblymenu.add_command(label="Edit Assembly Groups", command=self.unimplemented)
         self.menubar.add_cascade(label="Assembly", menu=self.assemblymenu)
 
@@ -892,7 +1181,21 @@ class TilemapEditorWindow(tk.Frame):
     def edit_tile_groups(self, index):
         """Open a dialog to edit the tile groups"""
         # Open the dialog
-        pass
+        result = GroupEditorDialog(self, TilemapEditorWindow.tile_dict,
+                                   TilemapEditorWindow.project_data["groups"]["tile"]).result
+        if result is not None:
+            TilemapEditorWindow.project_data["groups"]["tile"] = result
+            self.reload_groups()
+
+    @Decorators.apply_to_current_view
+    def edit_deco_groups(self, index):
+        """Open a dialog to edit the deco groups"""
+        # Open the dialog
+        result = GroupEditorDialog(self, TilemapEditorWindow.deco_dict,
+                                   TilemapEditorWindow.project_data["groups"]["deco"]).result
+        if result is not None:
+            TilemapEditorWindow.project_data["groups"]["deco"] = result
+            self.reload_groups()
 
     @staticmethod
     def unimplemented(event=None):
@@ -993,19 +1296,16 @@ class TilemapEditorWindow(tk.Frame):
 
     def set_layer(self, layer):
         """Set the currently editable layer"""
+        self.group_dropdown.grid_forget()
+        self.group_dropdown.forget()
         if layer == 0:
-            self.group_dropdown.forget()
             options = list([i for i, j in self.panes["tile"].items()])
-            self.group_dropdown = tk.OptionMenu(self, self.group, *options)
+            self.set_option_menu(options)
             self.group_dropdown.grid(row=0, column=2, sticky=tk.E)
         elif layer == 1:
-            self.group_dropdown.forget()
             options = list([i for i, j in self.panes["deco"].items()])
-            self.group_dropdown = tk.OptionMenu(self, self.group, *options)
+            self.set_option_menu(options)
             self.group_dropdown.grid(row=0, column=2, sticky=tk.E)
-        else:
-            self.group_dropdown.grid_forget()
-            self.group_dropdown.forget()
 
         self.set_pane("All", layer)
         for i in self.view_list:
@@ -1013,22 +1313,24 @@ class TilemapEditorWindow(tk.Frame):
 
     def add_pane(self, pane_name, pane_type, pane_entries):
         """Add a tile selection pane"""
-        if pane_type == "tile":
-            entries = [TilemapEditorWindow.tile_dict[i] for i in pane_entries]
-        elif pane_type == "deco":
-            entries = [TilemapEditorWindow.deco_dict[i] for i in pane_entries]
-        else:
+        if pane_type not in ["tile", "deco"]:
             raise ValueError(f'\'{pane_type}\' is not a valid pane type!')
 
         # Only add the pane if it has not already been added to the pane list
         if pane_name not in self.panes[pane_type]:
             self.panes[pane_type][pane_name] = TileCollection(self.selection_frame,
-                                                              entries,
+                                                              pane_entries,
                                                               pane_type,
                                                               borderwidth=1,
                                                               relief=tk.SUNKEN)
         else:
             raise ValueError('f\'{pane_name}\' is a duplicate group name')
+
+    def set_option_menu(self, options):
+        """Set the options in the group dropdown menu"""
+        self.group_dropdown["menu"].delete(0, 'end')
+        for option in options:
+            self.group_dropdown["menu"].add_command(label=option, command=tk._setit(self.group, option))
 
     def load_groups(self):
         """Loads all groups from the project file"""
@@ -1071,11 +1373,36 @@ class TilemapEditorWindow(tk.Frame):
 
         print("Loaded: ")
         with open("project.json", mode="r") as f:
-            data = json.load(f)
-            for i in data["groups"]:
-                print(i["name"], "({})".format(i["type"]), "-", i["entries"])
-                # Load pane
-                self.add_pane(i["name"], i["type"], i["entries"])
+            TilemapEditorWindow.project_data = json.load(f)
+            self.load_custom_panes(TilemapEditorWindow.project_data["groups"])
+
+    def load_custom_panes(self, groups: dict, verbose=False):
+        """Load custom panes"""
+        for group_type, j in groups.items():
+            for name, tiles in j.items():
+                if not verbose:
+                    print(f'{name}, ({group_type}) - {tiles}')
+                self.add_pane(name, group_type, tiles)
+
+    def reload_groups(self, modified=None):
+        """Tile panes from the TilemapEditorWindow.project_data["groups"] dictionary"""
+        # Unload tile panes
+        for name, pane in self.panes["tile"].copy().items():
+            if name != "All":
+                pane.forget()
+                del self.panes["tile"][name]
+
+        # Unload deco panes
+        for name, pane in self.panes["deco"].copy().items():
+            if name != "All":
+                pane.forget()
+                del self.panes["deco"][name]
+
+        # Load tile panes
+        self.load_custom_panes(TilemapEditorWindow.project_data["groups"])
+
+        # Reload option menu
+        self.set_layer(self.layer.get())
 
     @classmethod
     def _initialize_images(cls):
@@ -1453,7 +1780,7 @@ class TilemapView(tk.Frame):
         """Draw the current level's height map"""
         for deco_id, x, y in self.level.decomap:
             if deco_id != 0:
-                #self.canvas.create_image((x * 64 + 32, y * 64 + 32), image=TilemapEditorWindow.imgs["height_blank"])
+                # self.canvas.create_image((x * 64 + 32, y * 64 + 32), image=TilemapEditorWindow.imgs["height_blank"])
                 self.canvas.create_rectangle((x * 64, y * 64, x * 64 + 64, y * 64 + 64),
                                              fill="orange",
                                              outline="orange",
@@ -1551,7 +1878,8 @@ class TilemapView(tk.Frame):
             # Collision map mode
             elif self.master.master.layer.get() == 2:
                 self.canvas.bind("<B1-Motion>", self.draw_collider)
-                self.canvas.bind("<ButtonRelease-1>", lambda event: self._generic_finish_draw(event, self.draw_collider))
+                self.canvas.bind("<ButtonRelease-1>",
+                                 lambda event: self._generic_finish_draw(event, self.draw_collider))
                 self.canvas.bind("<ButtonPress-1>", lambda event: self._generic_start_draw(event, self.draw_collider))
             # Height map mode
             elif self.master.master.layer.get() == 3:
@@ -1979,6 +2307,14 @@ class TilemapView(tk.Frame):
             ids_data = json.dumps(TilemapEditorWindow.ids_data, indent=2)
             ids_data = re.sub(r'\[\s+(\d),\s+(\d),\s+(\d),\s+(\d)\s+\]', r'[\1, \2, \3, \4]', ids_data)
             f.write(ids_data)
+
+        # Save the project data to project.json
+        with open("project.json", mode="w") as f:
+            project_data = json.dumps(TilemapEditorWindow.project_data, indent=2)
+            project_data = re.sub(r'\s+([0-9.\-]+),', r'\1, ', project_data)
+            project_data = re.sub(r'\s+([0-9.\-]+)\s+\]', r' \1]', project_data)
+            project_data = re.sub(r':([0-9.\-]+)', r': \1', project_data)
+            f.write(project_data)
 
         # No file path has been set
         if file is None:
@@ -2583,7 +2919,6 @@ class TileCollection(TilePane):
     def __init__(self, parent, group, mode, **kw):
         """These are configurable groupings of tiles to make it easier to find specific tiles"""
         super().__init__(parent, **kw)
-
         # Save a reference to the tracker variable
         self.selected_id = tk.IntVar(self, 0, "selected_{}".format(mode))
 
@@ -2612,14 +2947,15 @@ class TileCollection(TilePane):
                 self.current_y += 1
                 self.current_x = 0
 
-            radiobutton = tk.Radiobutton(self.canvas,
-                                         indicator=0,
-                                         value=i,
-                                         variable=self.selected_id,
-                                         image=image_dict[i])
+            if i != -1:
+                radiobutton = tk.Radiobutton(self.canvas,
+                                             indicator=0,
+                                             value=i,
+                                             variable=self.selected_id,
+                                             image=image_dict[i])
 
-            # Configure new radiobutton
-            self.canvas.create_window(self.current_x * 72 + 36, self.current_y * 72 + 36, window=radiobutton)
+                # Configure new radiobutton
+                self.canvas.create_window(self.current_x * 72 + 36, self.current_y * 72 + 36, window=radiobutton)
             self.current_x += 1
 
         # Configure scroll-region
