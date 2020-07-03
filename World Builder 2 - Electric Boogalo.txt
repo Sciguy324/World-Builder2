@@ -65,14 +65,15 @@ Core Feature Elaboration:
 			-Tool that opens the level that a loading zone is referring to
 		
 	-World-view window:
-		-A map of the various levels, linked together based on how to get from one to another
-		-Creating/destroying a loading zone automatically adds/removes a connection
-		-Locations of each level is player controlled
-			-To avoid accidentally messing up the placements, they MUST be placed manually
+		--A map of the various levels
+		?-Levels linked together based on how to get from one to another
+		?-Creating/destroying a loading zone automatically adds/removes a connection
+		--Locations of each level is user controlled
+			--To avoid accidentally messing up the placements, they MUST be placed manually
 		-Can be used as a quick-access to open available levels
 		-Optional, and only accessible if a project file is detected
-		-Each level icon will have a miniature render of the level (img matrix saved to project file)
-		-Support for scrolling/moving around the view window
+		--Each level icon will have a miniature render of the level
+		--Support for scrolling/moving around the view window
 		-Search-bar to find entities (level-name dictionary saved to project file)
 
 	-Sprite editor window:

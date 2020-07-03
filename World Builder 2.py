@@ -317,9 +317,9 @@ class LightEditorDialog(Dialog):
                             (color.inner_diameter - color.outer_diameter) * (value - color.outer_diameter),
                             255.0), 0.0))
             if blacklight:
-                return max(min(155-n, 255), 0)
+                return max(min(155 - n, 255), 0)
             else:
-                return max(min(n-100, 255), 0)
+                return max(min(n - 100, 255), 0)
         except ZeroDivisionError:
             return 255
 
@@ -364,7 +364,7 @@ class LightEditorDialog(Dialog):
             # print('\t#%02x%02x%02x' % (red_intensity, greem_intensity, blue_intensity))
             # c = self.light_data.diameter * 64 - i
             c = 64 - i
-            self.canvas.create_oval((c * 2, c * 2,  256 - c * 2,  256 - c * 2),
+            self.canvas.create_oval((c * 2, c * 2, 256 - c * 2, 256 - c * 2),
                                     fill='#%02x%02x%02x' % (red_intensity, greem_intensity, blue_intensity),
                                     width=0)
             i -= 1
@@ -596,7 +596,7 @@ class GroupEditorGroup(tk.Frame):
 
         # Initialize the tile list
         if tiles is None:
-            self.tiles = [-1] * (16*9)
+            self.tiles = [-1] * (16 * 9)
         else:
             self.tiles = tiles
 
@@ -698,9 +698,6 @@ class GroupEditorGroup(tk.Frame):
 
 
 # TODO: Refactor ids list
-# TODO: Add tile assembly group editor dialog
-# TODO: Add tile assembly editor dialog
-# TODO: Add pattern editor dialog
 
 class CustomButton(ttk.Button):
     """A ttk button that has special effects"""
@@ -875,7 +872,6 @@ class TilemapEditorWindow(tk.Frame):
     loading_dict = {}
     light_dict = {}
     ids_data = {}
-    project_data = {}
     __initialized = False
 
     class Decorators(object):
@@ -895,15 +891,19 @@ class TilemapEditorWindow(tk.Frame):
         def hidden_event(cls, function):
             """For functions that should not be run if no views are currently open.
             An unused event argument is expected"""
+
             def inner(self, event=None):
                 function(self)
+
             return inner
 
         @classmethod
         def callback(cls, function):
             """Reduces the unneeded 'name=None, index=None, op=None' arguments in callback functions"""
+
             def inner(self, name=None, index=None, op=None):
                 function(self)
+
             return inner
 
     def __init__(self, parent, **kw):
@@ -1074,9 +1074,14 @@ class TilemapEditorWindow(tk.Frame):
         self.menubar.add_cascade(label="Tile", menu=self.tilemenu)
 
         # Create the assembly menubar
-        self.assemblymenu = tk.Menu(self.menubar, tearoff=0)
-        self.assemblymenu.add_command(label="Edit Assembly Groups", command=self.unimplemented)
-        self.menubar.add_cascade(label="Assembly", menu=self.assemblymenu)
+        # self.assemblymenu = tk.Menu(self.menubar, tearoff=0)
+        # self.assemblymenu.add_command(label="Edit Assembly Groups", command=self.unimplemented)
+        # self.menubar.add_cascade(label="Assembly", menu=self.assemblymenu)
+
+        self.project_menu = tk.Menu(self.menubar, tearoff=0)
+        self.project_menu.add_command(label="Add Current Level to Project", command=self.include_level)
+        self.project_menu.add_command(label="Remove Current Level from Project", command=self.exclude_level)
+        self.menubar.add_cascade(label="Project", menu=self.project_menu)
 
         # Create the help menubar
         self.helpmenu = tk.Menu(self.menubar, tearoff=0)
@@ -1205,9 +1210,9 @@ class TilemapEditorWindow(tk.Frame):
         """Open a dialog to edit the tile groups"""
         # Open the dialog
         result = GroupEditorDialog(self, TilemapEditorWindow.tile_dict,
-                                   TilemapEditorWindow.project_data["groups"]["tile"]).result
+                                   App.project_data["groups"]["tile"]).result
         if result is not None:
-            TilemapEditorWindow.project_data["groups"]["tile"] = result
+            App.project_data["groups"]["tile"] = result
             self.reload_groups()
 
     @Decorators.hidden_event
@@ -1215,9 +1220,9 @@ class TilemapEditorWindow(tk.Frame):
         """Open a dialog to edit the deco groups"""
         # Open the dialog
         result = GroupEditorDialog(self, TilemapEditorWindow.deco_dict,
-                                   TilemapEditorWindow.project_data["groups"]["deco"]).result
+                                   App.project_data["groups"]["deco"]).result
         if result is not None:
-            TilemapEditorWindow.project_data["groups"]["deco"] = result
+            App.project_data["groups"]["deco"] = result
             self.reload_groups()
 
     def import_tile(self, mode):
@@ -1256,6 +1261,34 @@ class TilemapEditorWindow(tk.Frame):
             self.panes[mode]["All"].add_option(next_id, mode)
 
             print(f'Imported {tile_name} from {file_path}')
+
+    @Decorators.apply_to_current_view
+    def include_level(self, index):
+        """Include the currently open level in the project.json file"""
+        # Level is not already in project.json
+        level = self.view_list[index].level
+        if level.name not in App.project_data["levels"]:
+            # Level must be saved in order to proceed
+            if self.view_list[index].saved and self.view_list[index].file_path is not None:
+                relative_path = self.view_list[index].file_path.replace((getcwd() + '/').replace('\\', '/'), '')
+                App.project_data["levels"][level.name] = {"path": relative_path, "world_pos": level.world_pos}
+                level.ignore_from_project = False
+                messagebox.showinfo("World Builder 2", "Level added to project.")
+            else:
+                messagebox.showerror("Unsaved Level", "Please save your level first before adding it to the project.")
+        else:
+            messagebox.showinfo("World Builder 2", "This level is already included in the project.")
+
+    @Decorators.apply_to_current_view
+    def exclude_level(self, index):
+        """Exclude the currently open level from the project.json file"""
+        level = self.view_list[index].level
+        if level.name in App.project_data["levels"]:
+            del App.project_data["levels"][level.name]
+            level.ignore_from_project = True
+            messagebox.showinfo("World Builder 2", "Level removed from project.")
+        else:
+            messagebox.showinfo("World Builder 2", "This level was not already in the project.")
 
     @staticmethod
     def unimplemented(event=None):
@@ -1316,10 +1349,13 @@ class TilemapEditorWindow(tk.Frame):
 
     def keybind_layer_mode(self, event):
         """Generic callback for setting the layer"""
-        if int(event.char) == 0:
-            self.layer.set(5)
-        else:
-            self.layer.set(int(event.char) - 5)
+        try:
+            if int(event.char) == 0:
+                self.layer.set(5)
+            else:
+                self.layer.set(int(event.char) - 5)
+        except ValueError:
+            print("Caught ValueError in keybind_layer_mode")
 
     def set_pane(self, pane, layer):
         """Set the currently viewable pane"""
@@ -1432,9 +1468,7 @@ class TilemapEditorWindow(tk.Frame):
                                                      relief=tk.SUNKEN)}
 
         print("Loaded: ")
-        with open("project.json", mode="r") as f:
-            TilemapEditorWindow.project_data = json.load(f)
-            self.load_custom_panes(TilemapEditorWindow.project_data["groups"])
+        self.load_custom_panes(App.project_data["groups"])
 
     def load_custom_panes(self, groups: dict, verbose=False):
         """Load custom panes"""
@@ -1445,7 +1479,7 @@ class TilemapEditorWindow(tk.Frame):
                 self.add_pane(name, group_type, tiles)
 
     def reload_groups(self):
-        """Tile panes from the TilemapEditorWindow.project_data["groups"] dictionary"""
+        """Tile panes from the App.project_data["groups"] dictionary"""
         # Unload tile panes
         for name, pane in self.panes["tile"].copy().items():
             if name != "All":
@@ -1459,7 +1493,7 @@ class TilemapEditorWindow(tk.Frame):
                 del self.panes["deco"][name]
 
         # Load tile panes
-        self.load_custom_panes(TilemapEditorWindow.project_data["groups"])
+        self.load_custom_panes(App.project_data["groups"])
 
         # Reload option menu
         self.set_layer(self.layer.get())
@@ -1741,7 +1775,7 @@ class TilemapView(tk.Frame):
         self.canvas.xview(tk.MOVETO, 0.0)
         self.canvas.yview(tk.MOVETO, 0.0)
 
-        self.image_view = Image.new('RGBA', (8*16, 8*9))
+        self.image_view = Image.new('RGBA', (8 * 16, 8 * 9))
 
         # Add the view to the parent frame
         parent.add(self.frame)
@@ -2101,8 +2135,8 @@ class TilemapView(tk.Frame):
             tile_x = int(self.canvas.xview()[0] * (len(self.level.collider[0])) + event.x / 32)
             tile_y = int(self.canvas.yview()[0] * (len(self.level.collider)) + event.y / 32)
         else:
-            tile_x = int(self.canvas.xview()[0] * (len(self.level.collider[0])-4) + event.x / 32)
-            tile_y = int(self.canvas.yview()[0] * (len(self.level.collider)-4) + event.y / 32)
+            tile_x = int(self.canvas.xview()[0] * (len(self.level.collider[0]) - 4) + event.x / 32)
+            tile_y = int(self.canvas.yview()[0] * (len(self.level.collider) - 4) + event.y / 32)
             tile_x += 2
             tile_y += 2
 
@@ -2182,7 +2216,7 @@ class TilemapView(tk.Frame):
         # Draw the tile
         self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
                                  image=TilemapEditorWindow.height_dict[height_option])
-        
+
         # Modify the height value in the ids list
         deco_id = self.level.decomap[tile_x, tile_y]
         # If there was actually a deco at the selected location
@@ -2350,19 +2384,19 @@ class TilemapView(tk.Frame):
             for x, j in enumerate(i):
                 for k in TilemapEditorWindow.ids_data["tile_ids"]:
                     if k["id"] == j:
-                        self.level.collider[y*2][x*2] = k["geo"][0]
-                        self.level.collider[y*2+1][x*2] = k["geo"][1]
-                        self.level.collider[y*2][x*2+1] = k["geo"][2]
-                        self.level.collider[y*2+1][x*2+1] = k["geo"][3]
+                        self.level.collider[y * 2][x * 2] = k["geo"][0]
+                        self.level.collider[y * 2 + 1][x * 2] = k["geo"][1]
+                        self.level.collider[y * 2][x * 2 + 1] = k["geo"][2]
+                        self.level.collider[y * 2 + 1][x * 2 + 1] = k["geo"][3]
 
         # Apply deco geometry
         for deco_id, x, y in self.level.decomap:
             for i in TilemapEditorWindow.ids_data["deco_ids"]:
                 if i["id"] == deco_id:
-                    self.level.collider[y*2][x*2] ^= i["geo"][0]
-                    self.level.collider[y*2+1][x*2] ^= i["geo"][1]
-                    self.level.collider[y*2][x*2+1] ^= i["geo"][2]
-                    self.level.collider[y*2+1][x*2+1] ^= i["geo"][3]
+                    self.level.collider[y * 2][x * 2] ^= i["geo"][0]
+                    self.level.collider[y * 2 + 1][x * 2] ^= i["geo"][1]
+                    self.level.collider[y * 2][x * 2 + 1] ^= i["geo"][2]
+                    self.level.collider[y * 2 + 1][x * 2 + 1] ^= i["geo"][3]
 
     def load_from_file(self, file):
         """Loads level data from a .json file"""
@@ -2390,14 +2424,29 @@ class TilemapView(tk.Frame):
             ids_data = json.dumps(TilemapEditorWindow.ids_data, indent=2)
             ids_data = re.sub(r'\[\s+(\d),\s+(\d),\s+(\d),\s+(\d)\s+\]', r'[\1, \2, \3, \4]', ids_data)
             f.write(ids_data)
+        # TODO: Save excluded levels to project.json?
+        # If this file is NOT part of the project and hasn't been excluded, ask whether it should be.
+        print(self.level.ignore_from_project)
+        if not self.level.ignore_from_project:
+            if self.level.name not in App.project_data["levels"]:
+                result = messagebox.askyesnocancel(title="Unregistered Level", message="This level was not found in "
+                                                                                       "the project.json file.  Would "
+                                                                                       "you like to save it to the "
+                                                                                       "project?  (Clicking 'No' will "
+                                                                                       "exclude for as long as it "
+                                                                                       "remains in the editor)")
+                if result is None:
+                    # User canceled the saving process
+                    return
+                elif result:
+                    # User added level to project.json
+                    App.project_data["levels"][self.level.name] = {"path": "", "world_pos": self.level.world_pos}
+                else:
+                    # User excluded level from project.json
+                    self.level.ignore_from_project = True
 
         # Save the project data to project.json
-        with open("project.json", mode="w") as f:
-            project_data = json.dumps(TilemapEditorWindow.project_data, indent=2)
-            project_data = re.sub(r'\s+([0-9.\-]+),', r'\1, ', project_data)
-            project_data = re.sub(r'\s+([0-9.\-]+)\s+\]', r' \1]', project_data)
-            project_data = re.sub(r':([0-9.\-]+)', r': \1', project_data)
-            f.write(project_data)
+        App.save_project_data()
 
         # No file path has been set
         if file is None:
@@ -2408,11 +2457,15 @@ class TilemapView(tk.Frame):
                 # User canceled saving, exit function
                 return
 
-            # Record path
+            # Obtain and save file path
             file = path.split(file)[1]
             self.level.name = path.splitext(file)[0]
             file = path.join("maps", file)
             self.file_path = file
+
+        if self.level.name in App.project_data["levels"]:
+            relative_path = file.replace((getcwd() + '/').replace('\\', '/'), '')
+            App.project_data["levels"][self.level.name]["path"] = relative_path
 
         # Write json tag to file
         with open(file, mode="w") as f:
@@ -2422,7 +2475,11 @@ class TilemapView(tk.Frame):
 
         # Save a screenshot of the entire file
         self.redraw_view(True)
-        self.image_view.save(f'temp/{self.level.name}.png')
+        self.image_view.save(f'mini/{self.level.name}.png')
+
+        # Also save the screenshot to the WorldEditorWindow
+        del WorldEditorWindow.mini_maps[self.level.name]
+        WorldEditorWindow.mini_maps[self.level.name] = ImageTk.PhotoImage(self.image_view)
 
     def backup_state(self):
         """Save a backup of the current level state"""
@@ -2514,6 +2571,9 @@ class Level:
         self.lightmap = LightmapDict()
         self.loading_zones = LoadingZoneDict()
 
+        # Special Status data
+        self.ignore_from_project = False
+
     def __eq__(self, other):
         if type(other) != Level:
             return False
@@ -2532,10 +2592,11 @@ class Level:
         self.level_width = len(self.tilemap[0])
         self.level_height = len(self.tilemap)
         self.decomap = Decomap()
-#        for i, j in enumerate(data["decomap"]):
-#            for k, m in enumerate(j):
-#                if m != 0:
-#                    self.decomap.add(k, i, m)
+        # Note: This is still here in case I ever need to upgrade an older map
+        #        for i, j in enumerate(data["decomap"]):
+        #            for k, m in enumerate(j):
+        #                if m != 0:
+        #                    self.decomap.add(k, i, m)
         for i, j, k in data["decomap"]:
             self.decomap.add(j, k, i)
 
@@ -2549,8 +2610,11 @@ class Level:
             blue = ColorFade(i["blue"]["amplitude"], i["blue"]["inner_diameter"], i["blue"]["outer_diameter"])
             self.lightmap[i["pos"][0], i["pos"][1]] = Light(i["diameter"], red, green, blue, i["blacklight"], True)
         self.default_start = data["spawn"]
-        self.world_pos = data["world_pos"]
         self.name = data["name"]
+        if self.name in App.project_data["levels"]:
+            self.world_pos = App.project_data["levels"][self.name]["world_pos"]
+        else:
+            self.world_pos = data["world_pos"]
 
     def copy(self):
         """Return a copy of the level data"""
@@ -2634,8 +2698,8 @@ class Level:
             if down > 0:
                 for i in range(down):
                     self.tilemap.append([0] * self.level_width)
-                    self.collider.append([0] * self.level_width*2)
-                    self.collider.append([0] * self.level_width*2)
+                    self.collider.append([0] * self.level_width * 2)
+                    self.collider.append([0] * self.level_width * 2)
             else:
                 for i in range(abs(down)):
                     self.tilemap.pop(-1)
@@ -2720,9 +2784,9 @@ class Decomap:
     def remove(self, x, y, deco_id=None):
         """Remove all items at the coordinates x-y from the decomap"""
         if deco_id:
-            self.values = [[i, j, k] for i, j, k in self.values if not(j == x and k == y and i == deco_id)]
+            self.values = [[i, j, k] for i, j, k in self.values if not (j == x and k == y and i == deco_id)]
         else:
-            self.values = [[i, j, k] for i, j, k in self.values if not(j == x and k == y)]
+            self.values = [[i, j, k] for i, j, k in self.values if not (j == x and k == y)]
 
     def set(self, x, y, deco_id):
         """Remove all entries that have the given coordinates and append a new value"""
@@ -3063,16 +3127,164 @@ class TileAssembly(SelectionPane):
 
 
 class WorldEditorWindow(tk.Frame):
+    mini_maps = {}
+    __initialized = False
 
     def __init__(self, parent, **kwargs):
         super().__init__(**kwargs)
 
+        # Perform first-time initialization, if applicable
+        if not WorldEditorWindow.__initialized:
+            WorldEditorWindow.__initialize()
+
+        # Declare some variables
+        self.start_x = 0
+        self.start_y = 0
+        self.selected_image = 0
+        self.bounding_box = [0, 0, 0, 0]
+        self.canvas_width = 0
+        self.canvas_height = 0
+        self.drag_mode = False
+
+        self.canvas_frame = tk.Frame(self)
+        self.canvas_frame.pack(fill=tk.BOTH, expand=1)
+        self.canvas_frame.columnconfigure(0, weight=1)
+        self.canvas_frame.rowconfigure(0, weight=1)
+
         # Create the canvas viewport
-        self.canvas = tk.Canvas(self, bg="BLACK", bd=0)
-        self.canvas.pack(fill=tk.BOTH, expand=1)
+        self.canvas = tk.Canvas(self.canvas_frame, bg="GRAY", bd=0)
+        self.canvas.grid(row=0, column=0, sticky=tk.NSEW)
+        self.canvas.bind("<ButtonPress-1>", func=self.click_canvas)
+        self.canvas.bind("<B1-Motion>", func=self.drag_canvas)
+        self.canvas.bind("<ButtonRelease-1>", func=self.release_click)
+        self.canvas.bind("<Control-s>", func=lambda event: App.save_project_data())
+
+        # Add the scrollbars
+        self.canvas_vbar = tk.Scrollbar(self.canvas_frame, orient=tk.VERTICAL, command=self.canvas.yview)
+        self.canvas_vbar.grid(row=0, column=1, sticky=tk.NS)
+        self.canvas_vbar.activate("slider")
+        self.canvas_hbar = tk.Scrollbar(self.canvas_frame, orient=tk.HORIZONTAL, command=self.canvas.xview)
+        self.canvas_hbar.grid(row=1, column=0, sticky=tk.EW)
+        self.canvas_hbar.activate("slider")
+        self.canvas.config(scrollregion=self.canvas.bbox("all"),
+                           xscrollcommand=self.canvas_hbar.set,
+                           yscrollcommand=self.canvas_vbar.set)
+        self.canvas.xview(tk.MOVETO, 0.0)
+        self.canvas.yview(tk.MOVETO, 0.0)
 
         # Add to parent frame
         parent.add(self, text="World Editor")
+
+        # Load visible levels
+        self.level_list = {}
+        self.level_references = {}
+        self.reload()
+
+    def event_to_coords(self, event):
+        """Convert the coordinates given by an event to actual coordinates on the canvas"""
+        return int(self.canvas.xview()[0] * self.canvas_width + event.x), int(
+            self.canvas.yview()[0] * self.canvas_height + event.y)
+
+    def release_click(self, event=None):
+        """Update the fact that nothing is selected"""
+        self.selected_image = None
+        self.drag_mode = False
+        self.update_bounding_box()
+
+    def click_canvas(self, event):
+        """Event callback for when the canvas is clicked"""
+        # If no image was selected, player is attempting to drag the canvas
+        if self.selected_image is None:
+            self.drag_mode = True
+            self.canvas.scan_mark(event.x, event.y)
+
+    def drag_canvas(self, event):
+        """Event callback for when the canvas is being dragged"""
+        # Only attempt to drag canvas when drag mode is enabled
+        if self.drag_mode:
+            self.canvas.scan_dragto(event.x, event.y, gain=1)
+
+    def click_event(self, event):
+        """Mark the starting coordinates"""
+        self.start_x, self.start_y = self.event_to_coords(event)
+        self.selected_image = event.widget.find_withtag('current')[0]
+
+    def move_event(self, event):
+        """Handle user clicking on one of the images on the canvas"""
+        # Determine which image is being interacted with
+        x, y = self.event_to_coords(event)
+
+        # Move the image with the mouse
+        self.canvas.move(self.selected_image, x - self.start_x, y - self.start_y)
+        self.level_list[self.level_references[self.selected_image]].world_pos[0] += x - self.start_x
+        self.level_list[self.level_references[self.selected_image]].world_pos[1] += y - self.start_y
+
+
+        # Set the starting x and y for next call to move_event
+        self.start_x = x
+        self.start_y = y
+
+    def reload(self):
+        """The generic reloading function for the World Editor Window"""
+        # Update registered levels
+        self.reload_levels()
+        self.redraw_canvas()
+
+    def update_bounding_box(self):
+        """Update the bounding box/scroll region of the canvas"""
+        bounding_box = list(self.canvas.bbox("all"))
+        maximum = int(max(abs(i) for i in bounding_box) * 1.5)
+        bounding_box = (-maximum, -maximum, maximum, maximum)
+        self.canvas.config(scrollregion=bounding_box)
+        self.canvas_width = bounding_box[2] - bounding_box[0]
+        self.canvas_height = bounding_box[3] - bounding_box[1]
+        self.bounding_box = bounding_box
+
+    def reload_levels(self):
+        """Updates the loaded levels"""
+        for level_name, level_data in App.project_data["levels"].items():
+            # Note: due to mutability, the world pos data should be automatically updated
+            if level_name not in self.level_list:
+                # Load any mini-level not already loaded
+                self.level_list[level_name] = WorldEditorLevel(level_name, level_data["world_pos"])
+
+    def redraw_canvas(self):
+        """Redraw elements on the canvas"""
+        self.canvas.delete('all')
+        self.level_references = {}
+        for level_name, level_data in self.level_list.items():
+            level_reference = self.canvas.create_image(level_data.world_pos[0],
+                                                       level_data.world_pos[1],
+                                                       image=WorldEditorWindow.mini_maps[level_name],
+                                                       tag=level_name)
+            self.level_references[level_reference] = level_name
+            self.canvas.tag_bind(level_name, '<Button-1>', self.click_event)
+            self.canvas.tag_bind(level_name, '<B1-Motion>', self.move_event)
+
+        # Update the scroll region
+        self.update_bounding_box()
+
+    @classmethod
+    def __initialize(cls):
+        """Initialization"""
+        # Load all the minimaps in the project
+        for level_name, level_data in App.project_data["levels"].items():
+            try:
+                img = Image.open(f'mini/{level_name}.png')
+            except FileNotFoundError:
+                img = Image.new('RGBA', (16, 16), 0)
+                print("File not found!")
+            cls.mini_maps[level_name] = ImageTk.PhotoImage(img)
+
+        cls.__initialized = True
+
+
+class WorldEditorLevel:
+    """Class to represent levels in the World Editor Window"""
+
+    def __init__(self, level_name, world_pos):
+        self.level_name = level_name
+        self.world_pos = world_pos
 
 
 class SpriteEditorWindow(tk.Frame):
@@ -3096,14 +3308,23 @@ class NotesEditorWindow(tk.Frame):
         super().__init__(**kwargs)
 
         # Create the text entry
-        self.textbox = tk.Text(self, borderwidth=1, padx=10, pady=10, maxundo=10)
+        self.textbox = tk.Text(self, borderwidth=1, padx=10, pady=10, maxundo=10, font="consolas 11")
         self.textbox.pack(fill=tk.BOTH, expand=1)
         self.textbox.bind("<Control-z>", lambda event: self.undo_edit())
         self.textbox.bind("<Control-y>", lambda event: self.redo_edit())
+        self.textbox.bind("<Control-s>", lambda event: self.save_notes())
         self.textbox.bind("<Control-BackSpace>", lambda event: self.delete_word())
+
+        # Add text to textbox
+        self.textbox.insert('1.0', App.project_data["notes"])
 
         # Add to parent frame
         parent.add(self, text="Notes")
+
+    def save_notes(self):
+        """Save notes to project.json"""
+        App.project_data["notes"] = self.textbox.get('1.0', 'end-1c')
+        App.save_project_data()
 
     def undo_edit(self):
         """Undo an edit"""
@@ -3135,9 +3356,14 @@ class NotesEditorWindow(tk.Frame):
 
 
 class App:
+    # Forgive me, for I have used variables with excessive scope
+    project_data = {}
 
     def __init__(self, parent):
         """World Builder 2"""
+        # Load project data
+        App.load_project_data()
+
         # Begin editor layout setup
         self.source = ttk.Notebook(parent)
 
@@ -3158,6 +3384,7 @@ class App:
 
     def update_toolbar(self, value):
         """Updates the toolbar to match the current tab"""
+        self.world_editor.reload()  # Ensure the world editor is reloaded.  I don't like putting this here.  Not Funland
         self.menubar.forget()
         self.menubar = tk.Menu(self.source.master)
         # Tilemap editor window toolbar
@@ -3166,6 +3393,22 @@ class App:
             self.source.master.config(menu=self.tilemap_editor.menubar)
         else:
             self.source.master.config(menu=self.menubar)
+
+    @classmethod
+    def load_project_data(cls):
+        """Load the project data from project.json"""
+        with open("project.json", mode="r") as f:
+            App.project_data = json.load(f)
+
+    @classmethod
+    def save_project_data(cls):
+        """Save the project data to project.json"""
+        with open("project.json", mode="w") as f:
+            project_data = json.dumps(cls.project_data, indent=2)
+            project_data = re.sub(r'\s+([0-9.\-]+),', r'\1, ', project_data)
+            project_data = re.sub(r'\s+([0-9.\-]+)\s+\]', r' \1]', project_data)
+            project_data = re.sub(r':([0-9.\-]+)', r': \1', project_data)
+            f.write(project_data)
 
 
 def main():
@@ -3184,7 +3427,6 @@ def main():
     root.iconphoto(False, icon)
 
     main_app = App(root)
-
     root.mainloop()
 
 
