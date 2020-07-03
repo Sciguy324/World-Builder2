@@ -1,0 +1,55 @@
+{
+  "name": "Pig",
+  "world_data": {
+    "level": "demo",
+    "scope": "global"
+  },
+  "focus": false,
+  "position": {
+    "x": 1280.0,
+    "y": 384.0,
+    "base_speed": 0.45,
+    "auto_size": true,
+    "w": 0.0,
+    "h": 0.0,
+    "collide": true
+  },
+  "path_type": 2,
+  "path_delay": 750,
+  "facing_type": 1,
+  "animation": {
+    "0": {
+      "root_path": "entities/npc/pig/",
+      "images": [ "pig_front.png", "pig_front_walk1.png", "pig_front_walk2.png" ],
+      "sequence": [ 0, 1, 0, 2, 0 ],
+      "frame_time": [ 0.025, 0.10, 0.10, 0.10, 0.075 ],
+      "scale_factor": 4
+    },
+    "1": {
+      "root_path": "entities/npc/pig/",
+      "images": [ "pig_back.png", "pig_back_walk1.png", "pig_back_walk2.png" ],
+      "sequence": [ 0, 1, 0, 2, 0 ],
+      "frame_time": [ 0.025, 0.10, 0.10, 0.10, 0.075 ],
+      "scale_factor": 4
+    },
+    "2": {
+      "root_path": "entities/npc/pig/",
+      "images": [ "pig_left.png", "pig_left_walk1.png", "pig_left_walk2.png" ],
+      "sequence": [ 0, 1, 0, 2, 0 ],
+      "frame_time": [ 0.025, 0.10, 0.10, 0.10, 0.075 ],
+      "scale_factor": 4
+    },
+    "3": {
+      "root_path": "entities/npc/pig/",
+      "images": [ "pig_right.png", "pig_right_walk1.png", "pig_right_walk2.png" ],
+      "sequence": [ 0, 1, 0, 2, 0 ],
+      "frame_time": [ 0.025, 0.10, 0.10, 0.10, 0.075 ],
+      "scale_factor": 4
+    }
+  },
+  "stats": {
+    "invulnerable": true,
+    "speed_modifier": 1.0,
+    "health": 100
+  }
+}

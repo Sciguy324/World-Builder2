@@ -7,6 +7,8 @@ from os import path
 from os import getcwd
 import json
 import re
+from dataclasses import dataclass, field
+from typing import List
 
 
 class ScrollbarEntry(tk.Frame):
@@ -806,7 +808,7 @@ class CustomNotebook(ttk.Notebook):
         element = self.identify(event.x, event.y)
         index = self.index("@%d,%d" % (event.x, event.y))
 
-        # Close tab if user clicked "close"
+        # Raise an event to inform the relevant classes that the given tab is being closed
         if "close" in element and self._active == index:
             # self.forget(index)
             self.event_generate("<<NotebookTabClosed>>", x=index)
@@ -856,9 +858,6 @@ class CustomNotebook(ttk.Notebook):
                 ]
             }),
         ])
-        # print(style.layout("CustomNotebook.tab"))
-        # print(style.element_names())
-        # style.layout("CustomNotebook", [("CustomNotebook.close", {"side": "right", "sticky": "nswe"})])
 
 
 class TilemapEditorWindow(tk.Frame):
@@ -2810,74 +2809,51 @@ class Decomap:
         return self.copy().values
 
 
+@dataclass
 class LoadingZone:
     """Data structure for loading zones"""
-
-    def __init__(self, target_level, target_pos):
-        self.target_level = target_level
-        self.target_pos = target_pos
-
-    def __repr__(self):
-        """Return a string representation of the loading zone"""
-        return "<Loading Zone | target: {} at {}>".format(self.target_level, self.target_pos)
+    target_level: str
+    target_pos: List[int] = field(default_factory=list)
 
     def copy(self):
         """Return a copy of the loading zone"""
-        return LoadingZone(str(self.target_level), [self.target_pos[0], self.target_pos[1]])
+        return LoadingZone(self.target_level, self.target_pos.copy())
 
 
+@dataclass
 class ColorFade:
     """Data structure for color fading data present in lights"""
-
-    def __init__(self, amplitude, inner_diameter, outer_diameter):
-        self.amplitude = amplitude
-        self.inner_diameter = inner_diameter
-        self.outer_diameter = outer_diameter
-
-    def __repr__(self):
-        """Return a string representation of the light"""
-        return "<ColorFade | Amplitude: {}, Inner Diameter: {}, Outer Diameter: {}>".format(self.amplitude,
-                                                                                            self.inner_diameter,
-                                                                                            self.outer_diameter)
+    amplitude: float = 0.0
+    inner_diameter: float = 0.0
+    outer_diameter: float = 0.0
 
     def copy(self):
         """Return a copy of the ColorFade"""
-        return ColorFade(float(self.amplitude), float(self.inner_diameter), float(self.outer_diameter))
+        return ColorFade(self.amplitude, self.inner_diameter, self.outer_diameter)
 
     def jsonify(self):
         """Return a dictionary representation ready for use in a JSON tag"""
-        return {"amplitude": self.amplitude,
-                "inner_diameter": self.inner_diameter,
-                "outer_diameter": self.outer_diameter}
+        return self.copy().__dict__
 
 
+@dataclass
 class Light:
     """Data structure for lights"""
-
-    def __init__(self, diameter, red: ColorFade, green: ColorFade, blue: ColorFade, blacklight=False, active=False):
-        self.diameter = diameter
-        self.red = red
-        self.green = green
-        self.blue = blue
-        self.blacklight = blacklight
-        self.active = active
-
-    def __repr__(self):
-        """Return a string representation of the light"""
-        return "<Light | size: {}, blacklight: {},\nr: {},\ng: {},\nb: {}>".format(self.diameter,
-                                                                                   self.blacklight,
-                                                                                   self.red,
-                                                                                   self.green,
-                                                                                   self.blue)
+    diameter: float
+    red: ColorFade
+    green: ColorFade
+    blue: ColorFade
+    blacklight: bool = False
+    active: bool = False
 
     def copy(self):
         """Return a copy of the light"""
-        return Light(float(self.diameter),
+        return Light(self.diameter,
                      self.red.copy(),
                      self.green.copy(),
                      self.blue.copy(),
-                     bool(self.blacklight),
-                     bool(self.active))
+                     self.blacklight,
+                     self.active)
 
 
 class CoordinateDict:
@@ -3223,7 +3199,6 @@ class WorldEditorWindow(tk.Frame):
         self.level_list[self.level_references[self.selected_image]].world_pos[0] += x - self.start_x
         self.level_list[self.level_references[self.selected_image]].world_pos[1] += y - self.start_y
 
-
         # Set the starting x and y for next call to move_event
         self.start_x = x
         self.start_y = y
@@ -3303,6 +3278,103 @@ class SpriteEditorWindow(tk.Frame):
 
         # Add to parent frame
         parent.add(self, text="Sprite Editor")
+
+
+@dataclass
+class SpriteWorldData:
+    level: str = "void"
+    scope: str = "local"
+
+
+@dataclass
+class SpritePosition:
+    x: float = 0.0
+    y: float = 0.0
+    z: int = 1
+    base_speed: float = 1.0
+    auto_size: bool = True
+    w: float = 0.0
+    h: float = 0.0
+    collide: bool = False
+
+
+@dataclass
+class SpriteAnimation:
+    root_path: str = "entities/"
+    images: List[str] = field(default_factory=list)
+    sequence: List[int] = field(default_factory=list)
+    frame_time: List[float] = field(default_factory=list)
+    scale_factor: int = 1
+
+
+@dataclass
+class SpriteStats:
+    invulnerable: bool = True
+    speed_modifier: float = 1.0
+    health: int = 100
+
+
+class Sprite:
+
+    def __init__(self):
+        self.name = ""
+        self.world_data = SpriteWorldData()
+        self.focus = False
+        self.position = SpritePosition()
+        self.path_type = 0
+        self.path_delay = 0
+        self.facing_type = 0
+        self.animation = {}
+        self.stats = SpriteStats()
+
+    def load_from_json(self, json_dict):
+        """Load a sprite from a json dictionary"""
+        self.name = json_dict["name"]
+        self.world_data.level = json_dict["world_data"]["level"]
+        self.world_data.scope = json_dict["world_data"]["scope"]
+        self.focus = json_dict["focus"]
+        self.position = SpritePosition(x=json_dict["position"]["x"],
+                                       y=json_dict["position"]["y"],
+                                       z=json_dict["position"]["z"],
+                                       base_speed=json_dict["position"]["base_speed"],
+                                       auto_size=json_dict["position"]["auto_size"],
+                                       w=json_dict["position"]["w"],
+                                       h=json_dict["position"]["h"],
+                                       collide=json_dict["position"]["collide"])
+        self.path_type = json_dict["path_type"]
+        self.path_delay = json_dict["path_delay"]
+        self.facing_type = json_dict["facing_type"]
+        self.animation = {}
+        for animation_id, animation_data in json_dict["animation"].items():
+            self.animation[animation_id] = SpriteAnimation(root_path=animation_data["root_path"],
+                                                           images=animation_data["images"],
+                                                           sequence=animation_data["sequence"],
+                                                           frame_time=animation_data["frame_time"],
+                                                           scale_factor=animation_data["scale_factor"])
+        self.stats = SpriteStats(invulnerable=json_dict["stats"]["invulnerable"],
+                                 speed_modifier=json_dict["stats"]["speed_modifier"],
+                                 health=json_dict["stats"]["health"])
+
+    def jsonify(self):
+        """Convert sprite data to a formatted json string"""
+        # Build the json string
+        result = json.dumps({"name": self.name,
+                             "world_data": self.world_data.__dict__,
+                             "focus": self.focus,
+                             "position": self.position.__dict__,
+                             "path_type": self.path_type,
+                             "path_delay": self.path_delay,
+                             "facing_type": self.facing_type,
+                             "animation": dict((i, j.__dict__) for i, j in self.animation.items()),
+                             "stats": self.world_data.__dict__},
+                            indent=4)
+
+        # Format the json string using regular expressions
+        result = re.sub(r'\s+([0-9.\-]+),', r'\1, ', result)
+        result = re.sub(r'\s+([0-9.\-]+)\s+\]', r' \1]', result)
+        result = re.sub(r':([0-9.\-]+)', r': \1', result)
+
+        return result
 
 
 class NotesEditorWindow(tk.Frame):

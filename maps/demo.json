@@ -205,6 +205,6 @@
     }
   ],
   "spawn": [11, 10],
-  "world_pos": [0, 0],
+  "world_pos": [-139, 43],
   "name": "demo"
 }

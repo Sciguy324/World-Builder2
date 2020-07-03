@@ -1,0 +1,56 @@
+{
+  "name": "Player",
+  "world_data": {
+    "level": "demo",
+    "scope": "global"
+  },
+  "focus": true,
+  "position": {
+    "x": 704.0,
+    "y": 640.0,
+    "z": 1,
+    "base_speed": 1.0,
+    "auto_size": true,
+    "w": 0.0,
+    "h": 0.0,
+    "collide": true
+  },
+  "path_type": 1,
+  "path_delay": 0,
+  "facing_type": 1,
+  "animation": {
+    "0": {
+      "root_path": "entities/player/",
+      "images": [ "player_front.png", "player_front_walk1.png", "player_front_walk2.png" ],
+      "sequence": [ 0, 1, 0, 2, 0 ],
+      "frame_time": [ 0.05, 0.20, 0.20, 0.20, 0.15 ],
+      "scale_factor": 4
+    },
+    "1": {
+      "root_path": "entities/player/",
+      "images": [ "player_back.png", "player_back_walk1.png", "player_back_walk2.png" ],
+      "sequence": [ 0, 1, 0, 2, 0 ],
+      "frame_time": [ 0.05, 0.20, 0.20, 0.20, 0.15 ],
+      "scale_factor": 4
+    },
+    "2": {
+      "root_path": "entities/player/",
+      "images": [ "player_left.png", "player_left_walk1.png", "player_left_walk2.png" ],
+      "sequence": [ 0, 1, 0, 2, 0 ],
+      "frame_time": [ 0.05, 0.20, 0.20, 0.20, 0.15 ],
+      "scale_factor": 4
+    },
+    "3": {
+      "root_path": "entities/player/",
+      "images": [ "player_right.png", "player_right_walk1.png", "player_right_walk2.png" ],
+      "sequence": [ 0, 1, 0, 2, 0 ],
+      "frame_time": [ 0.05, 0.20, 0.20, 0.20, 0.15 ],
+      "scale_factor": 4
+    }
+  },
+  "stats": {
+    "invulnerable": true,
+    "speed_modifier": 1.0,
+    "health": 100
+  }
+}
