@@ -1085,7 +1085,7 @@ class TilemapEditorWindow(tk.Frame):
 
         # Create the help menubar
         self.helpmenu = tk.Menu(self.menubar, tearoff=0)
-        self.helpmenu.add_command(label="Ok", command=self.unimplemented)
+        self.helpmenu.add_command(label="This menubar cannot help you", command=self.unimplemented)
         self.menubar.add_cascade(label="Help", menu=self.helpmenu)
 
         # Create initial tilemap view
@@ -2478,8 +2478,9 @@ class TilemapView(tk.Frame):
         self.image_view.save(f'mini/{self.level.name}.png')
 
         # Also save the screenshot to the WorldEditorWindow
-        del WorldEditorWindow.mini_maps[self.level.name]
-        WorldEditorWindow.mini_maps[self.level.name] = ImageTk.PhotoImage(self.image_view)
+        if not self.level.ignore_from_project:
+            del WorldEditorWindow.mini_maps[self.level.name]
+            WorldEditorWindow.mini_maps[self.level.name] = ImageTk.PhotoImage(self.image_view)
 
     def backup_state(self):
         """Save a backup of the current level state"""
@@ -2614,7 +2615,10 @@ class Level:
         if self.name in App.project_data["levels"]:
             self.world_pos = App.project_data["levels"][self.name]["world_pos"]
         else:
-            self.world_pos = data["world_pos"]
+            try:
+                self.world_pos = data["world_pos"]
+            except KeyError:
+                self.world_pos = [0, 0]
 
     def copy(self):
         """Return a copy of the level data"""
