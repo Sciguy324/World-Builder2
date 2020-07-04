@@ -778,9 +778,9 @@ class CustomNotebook(ttk.Notebook):
     __initialized = False
 
     def __init__(self, *args, **kwargs):
-        if not self.__initialized:
-            self.__initialize_custom_style()
-            self.__initialized = True
+        if not CustomNotebook.__initialized:
+            CustomNotebook.__initialize_custom_style()
+            CustomNotebook.__initialized = True
 
         kwargs["style"] = "CustomNotebook"
         ttk.Notebook.__init__(self, *args, **kwargs)
@@ -816,9 +816,10 @@ class CustomNotebook(ttk.Notebook):
         self.state(["!pressed"])
         self._active = None
 
-    def __initialize_custom_style(self):
+    @classmethod
+    def __initialize_custom_style(cls):
         style = ttk.Style()
-        self.images = (
+        cls.images = (
             tk.PhotoImage("img_close", data='''
                 R0lGODlhCAAIAKEDAA4ODjs7O4+Pj8oAACH5BAEKAAMALAAAAAAIAAgAAAISDIYD
                 Zrj3XgJCnFmv\nMlJu7wQFADs=
@@ -1093,6 +1094,7 @@ class TilemapEditorWindow(tk.Frame):
     @Decorators.hidden_event
     def _open_map(self):
         """Event callback for opening a level"""
+        # Make sure the tilemap editor is actually open
         if self.master.index("current") != 0:
             return
         file = filedialog.askopenfilename(filetypes=[("Json", "*.json")], defaultextension=[("Json", "*.json")])
@@ -1777,6 +1779,8 @@ class TilemapView(tk.Frame):
         self.image_view = Image.new('RGBA', (8 * 16, 8 * 9))
 
         # Add the view to the parent frame
+        # This isn't supposed to be self.frame, but I'm worried if I change it, something will break
+        # Will fix later™
         parent.add(self.frame)
         self.update_title()
 
@@ -1817,11 +1821,6 @@ class TilemapView(tk.Frame):
             # User wants to continue without saving
             if action is False:
                 pass
-
-        self.frame.unbind_all(["<<TilemapEditorUpdateMode>>",
-                               "<<TilemapEditorGridToggle>>",
-                               "<<TilemapEditorBorderToggle>>",
-                               "<<TilemapEditorForceRedraw>>"])
         self.frame.forget()
         return True
 
@@ -3258,26 +3257,404 @@ class WorldEditorWindow(tk.Frame):
         cls.__initialized = True
 
 
+@dataclass
 class WorldEditorLevel:
     """Class to represent levels in the World Editor Window"""
-
-    def __init__(self, level_name, world_pos):
-        self.level_name = level_name
-        self.world_pos = world_pos
+    level_name: str
+    world_pos: List[int]
 
 
 class SpriteEditorWindow(tk.Frame):
 
     def __init__(self, parent, **kwargs):
         # Initialize superclass
-        super().__init__(**kwargs)
+        super().__init__(parent, **kwargs)
 
-        # Create the canvas viewport
-        self.canvas = tk.Canvas(self, bg="WHITE", bd=0)
-        self.canvas.pack(fill=tk.BOTH, expand=1)
+        # Set up some variables
+        self.project_pane_state = tk.BooleanVar(self, False, "ProjectPaneState")
+        self.project_pane_state.trace('w', lambda name, index, op: self.set_project_pane())
+
+        self.view_list = []
+        self.view_index = 0
+
+        self.main_frame = tk.Frame(self)
+        self.main_frame.pack(fill=tk.BOTH, expand=1)
+        self.main_frame.columnconfigure(3, weight=1)
+        self.main_frame.rowconfigure(0, weight=1)
+
+        # Create the hidden sprite selector pane
+        self.project_sprite_frame = tk.Frame(self.main_frame, width=512)
+
+        self.project_sprite_button = tk.Checkbutton(self.main_frame, indicatoron=False, text=" » ",
+                                                    var=self.project_pane_state)
+        self.project_sprite_button.grid(row=0, column=1, sticky=tk.NS)
+
+        # Create the editing notebook
+        self.new_view_button = ttk.Button(self.main_frame, command=self.new_view,
+                                          image=TilemapEditorWindow.imgs["add_new"])
+        self.new_view_button.grid(row=0, column=2, sticky=tk.NW)
+
+        self.editing_notebook = CustomNotebook(self.main_frame)
+        self.editing_notebook.bind("<<NotebookTabClosed>>", self.close_view)
+        self.editing_notebook.grid(row=0, column=3, sticky=tk.NSEW)
+
+        # Add the menubar
+        self.menubar = tk.Menu(self.master)
+
+        self.filemenu = tk.Menu(self.menubar)
+        self.filemenu.add_command()
+
+        # TODO: Add keybindings
+        self.filemenu = tk.Menu(self.menubar, tearoff=0)
+        self.filemenu.add_command(label="Open Sprite (Ctrl-O)", command=self.open_sprite)
+        self.filemenu.add_command(label="Save Sprite (Ctrl-S)", command=lambda: self.save_sprite(False))
+        self.filemenu.add_command(label="Save Sprite As (Ctrl-Shift-S)", command=lambda: self.save_sprite(True))
+        self.filemenu.add_command(label="New Sprite (Ctrl-N)", command=self.new_view)
+        self.filemenu.add_command(label="Close Sprite (Ctrl-W)", command=self.close_view)
+        #self.filemenu.add_separator()
+        #self.filemenu.add_command(label="Settings", command=self.unimplemented)
+        self.menubar.add_cascade(label="File", menu=self.filemenu)
+
+        # Launch default untitled view
+        self.new_view(ignore_viewable=True)
 
         # Add to parent frame
         parent.add(self, text="Sprite Editor")
+
+    def set_project_pane(self):
+        """Event callback for displaying the project pane"""
+        if self.project_pane_state.get():
+            self.project_sprite_frame.grid(row=0, column=0, sticky=tk.NS)
+            self.project_sprite_button.config(text=" « ")
+        else:
+            self.project_sprite_frame.grid_forget()
+            self.project_sprite_button.config(text=" » ")
+
+    def open_sprite(self):
+        """Open a sprite from a file"""
+        if self.master.index("current") != 2:
+            return
+        file = filedialog.askopenfilename(filetypes=[("Json", "*.json")], defaultextension=[("Json", "*.json")])
+        if file == "" or file is None:
+            return
+        self.new_view()
+        if not self.view_list[-1].load_from_file(file):
+            self.close_view(self.editing_notebook.index("end") - 1)
+
+    def save_sprite(self, save_as=False):
+        """Save a sprite to a file"""
+        if self.master.index("current") != 2:
+            return
+        self.view_list[-1].save(save_as)
+
+    def new_view(self, ignore_viewable=False):
+        """Create a new, blank view"""
+        if self.master.index("current") != 2 and not ignore_viewable:
+            return
+        # Create new view instance
+        self.view_list.append(SpriteView(self.editing_notebook))
+        self.editing_notebook.select(self.editing_notebook.index("end") - 1)
+
+    def close_view(self, event):
+        """Close the currently open view"""
+        # Check with the view if it wants to close
+        if type(event) == int:
+            # Index of the view in question passed in directly
+            index = event
+        else:
+            # Index of value was passed in through the x-coordinate of an event
+            index = event.x
+        if self.view_list[index].close():
+            # Attempt to close view was not interrupted by user (such as by clicking "cancel" in an unsaved view)
+            del self.view_list[index]
+
+
+class LabeledEntry:
+
+    def __init__(self, parent, row, label, variable_name, variable_type, function):
+
+        self.ignore_callback = True
+
+        # Save some variables
+        self.variable_name = variable_name
+        self.variable_type = variable_type
+
+        # Create text variable
+        self.text_before = ""
+        self.text_var = tk.StringVar(parent, "", f'{variable_name}_text')
+        self.text_var.trace('w', lambda name, index, op, x=function: self.entry_callback(x))
+
+        # Create the label
+        self.label = tk.Label(parent, text=f'{label}:')
+        self.label.grid(row=row, column=0, sticky=tk.W)
+
+        # Create the entry box
+        self.name_entry = tk.Entry(parent, textvariable=self.text_var)
+        self.name_entry.grid(row=row, column=1, padx=4)
+
+    def entry_callback(self, function):
+        """Event callback for when the entry text is modified"""
+        if self.ignore_callback:
+            return
+        if len(self.text_var.get()) != 0:
+            try:
+                text = self.variable_type(self.text_var.get())
+            except ValueError:
+                messagebox.showerror("Error", "Invalid entry")
+            else:
+                self.text_before = self.text_var.get()
+                function(self.variable_name, text)
+
+    def insert_data(self, value):
+        self.ignore_callback = True
+        self.text_var.set(value)
+        self.ignore_callback = False
+
+
+class CategoryEditor(tk.LabelFrame):
+
+    def __init__(self, parent, title, label_type_dict, **kwargs):
+        super().__init__(parent, text=title, **kwargs)
+
+        self.entries = {}
+        for i, (var, var_type) in enumerate(label_type_dict.items()):
+            label = var.replace('_', ' ').title()
+            self.entries[var] = LabeledEntry(self, i, label, var, var_type, self.modify_value)
+
+    def modify_value(self, variable_name, value):
+        """Override in subclass"""
+        pass
+
+    def update_from_sprite(self):
+        """Override in subclass"""
+        pass
+
+
+class GeneralEditor(CategoryEditor):
+
+    def modify_value(self, variable_name, value):
+        """Event callback for a general-type entry being modified.  Value is trusted to be valid"""
+        if variable_name in self.master.sprite.__dict__:
+            self.master.sprite.__dict__[variable_name] = value
+
+    def update_from_sprite(self):
+        """Insert data from the sprite"""
+        for i, j in self.entries.items():
+            j.insert_data(self.master.sprite.__dict__[i])
+
+
+class WorldDataEditor(CategoryEditor):
+
+    def modify_value(self, variable_name, value):
+        """Event callback for a general-type entry being modified.  Value is trusted to be valid"""
+        if variable_name in self.master.sprite.world_data.__dict__:
+            self.master.sprite.world_data.__dict__[variable_name] = value
+
+    def update_from_sprite(self):
+        """Insert data from the sprite"""
+        for i, j in self.entries.items():
+            j.insert_data(self.master.sprite.world_data.__dict__[i])
+
+
+class PositionEditor(CategoryEditor):
+
+    def modify_value(self, variable_name, value):
+        """Event callback for a general-type entry being modified.  Value is trusted to be valid"""
+        if variable_name in self.master.sprite.position.__dict__:
+            self.master.sprite.position.__dict__[variable_name] = value
+
+    def update_from_sprite(self):
+        """Insert data from the sprite"""
+        for i, j in self.entries.items():
+            j.insert_data(self.master.sprite.position.__dict__[i])
+
+
+class StatsEditor(CategoryEditor):
+
+    def modify_value(self, variable_name, value):
+        """Event callback for a general-type entry being modified.  Value is trusted to be valid"""
+        if variable_name in self.master.sprite.stats.__dict__:
+            self.master.sprite.world_data.__dict__[variable_name] = value
+
+    def update_from_sprite(self):
+        """Insert data from the sprite"""
+        for i, j in self.entries.items():
+            j.insert_data(self.master.sprite.stats.__dict__[i])
+
+
+class SpriteView(ttk.Frame):
+
+    def __init__(self, parent, **kwargs):
+        # Initialize the superclass
+        super().__init__(parent, **kwargs)
+
+        # Ensure the parent widget is a CustomNotebook
+        if type(parent) != CustomNotebook:
+            raise TypeError("Cannot assign a {} to a {}".format(SpriteView, type(parent)))
+
+        # Declare some variables
+        self.view_name = "Untitled"
+        self.file_path = None
+        self.saved = True
+
+        # Declare sprite
+        self.sprite = Sprite()
+
+        # Create animation window
+        self.animation_frame = tk.LabelFrame(self, text="Animations")
+        self.animation_frame.pack(fill=tk.X, expand=1)
+
+        self.animation_canvas = tk.Canvas(self.animation_frame, width=256, height=256, bg="WHITE", bd=1)
+        self.animation_canvas.grid(row=1, column=0)
+
+        self.animation_config_frame = tk.Frame(self.animation_frame)
+        self.animation_config_frame.grid(row=1, column=1)
+
+        self.image_dict = {}
+
+        # self.name_entry = LabeledEntry(self.general_frame, 0, "Name", "name", self.modify_generic)
+        # self.focus_entry = LabeledEntry(self.general_frame, 1, "Focus?", "focus", self.modify_generic)
+        # self.path_type_entry = LabeledEntry(self.general_frame, 2, "Path Type", "path_type", self.modify_generic)
+        # self.path_delay_entry = LabeledEntry(self.general_frame, 3, "Path Delay", "path_delay", self.modify_generic)
+        # self.facing_type_entry = LabeledEntry(self.general_frame, 4, "Facing Type", "facing_type", self.modify_generic)
+
+        # Create the general-purpose editing window
+        self.general_table = GeneralEditor(self, "General", self.sprite.__annotations__)
+        self.general_table.pack(fill=tk.X, expand=1)
+
+        # Create the world data editing window
+        self.world_table = WorldDataEditor(self, "World Data", self.sprite.world_data.__annotations__)
+        self.world_table.pack(fill=tk.X, expand=1)
+
+        # Create the position editing window
+        self.position_table = PositionEditor(self, "Positioning", self.sprite.position.__annotations__)
+        self.position_table.pack(fill=tk.X, expand=1)
+
+        # Create the stats editing window
+        self.stats_table = StatsEditor(self, "Stats", self.sprite.stats.__annotations__)
+        self.stats_table.pack(fill=tk.X, expand=1)
+
+        # Add to parent widget
+        parent.add(self, text=self.view_name)
+
+    def modify_generic(self, entry_name, value):
+        """Event callback for a general-type entry being modified.  Value is trusted to be valid"""
+        if entry_name in self.sprite.__dict__:
+            self.sprite.__dict__[entry_name] = value
+
+    def modify_world_data(self, entry_name, value):
+        """Event callback for a general-type entry being modified.  Value is trusted to be valid"""
+        if entry_name in self.sprite.world_data.__dict__:
+            self.sprite.world_data.__dict__[entry_name] = value
+
+    def close(self, ignore_saved=False):
+        """Destroy this sprite-view"""
+        if not(self.saved or ignore_saved):
+            # If progress is unsaved, ask user if they want to save
+            action = messagebox.askyesnocancel("World Builder 2",
+                                               "Progress is unsaved.  Would you like to save first?",
+                                               icon='warning')
+
+            # User wants to save progress before closing tab
+            if action:
+                self.save_to_file(self.file_path)
+
+            # User wants to cancel
+            if action is None:
+                return False
+
+            # User wants to continue without saving
+            if action is False:
+                pass
+        self.destroy()
+        return True
+
+    def load_from_file(self, file):
+        with open(file, mode='r') as rf:
+            json_dict = json.load(rf)
+
+        # Load data to sprite from json dictionary
+        if not self.sprite.load_from_json(json_dict):
+            return False
+
+        # Update status variables
+        self.saved = True
+        self.file_path = file
+        self.view_name = path.split(file)[1]
+        self.update_title()
+
+        # Sync data from sprite to entries
+        self.general_table.update_from_sprite()
+        self.world_table.update_from_sprite()
+        self.position_table.update_from_sprite()
+        self.stats_table.update_from_sprite()
+
+        return True
+
+    def save(self, save_as=False):
+        if save_as:
+            self.save_to_file(None)
+        else:
+            self.save_to_file(self.file_path)
+
+    def save_to_file(self, file):
+        """Save the sprite to a file"""
+        # If this file is NOT part of the project and hasn't been excluded, ask whether it should be.
+        if not self.sprite.ignore_from_project:
+            if self.view_name not in App.project_data["sprites"]:
+                result = messagebox.askyesnocancel(title="Unregistered Level", message="This sprite was not found in "
+                                                                                       "the project.json file.  Would "
+                                                                                       "you like to save it to the "
+                                                                                       "project?  (Clicking 'No' will "
+                                                                                       "exclude for as long as it "
+                                                                                       "remains in the editor)")
+                if result is None:
+                    # User canceled the saving process
+                    return
+                elif result:
+                    # User added level to project.json
+                    App.project_data["sprites"][self.view_name] = {"path": ""}
+                else:
+                    # User excluded level from project.json
+                    self.sprite.ignore_from_project = True
+
+        # Save the project data to project.json
+        App.save_project_data()
+
+        # No file path has been set
+        if file is None:
+            file = filedialog.asksaveasfilename(filetypes=[('JSON File', '*.json')],
+                                                defaultextension=[('JSON File', '*.json')])
+            print("File: ", file)
+            if file == "":
+                # User canceled saving, exit function
+                return
+
+            # Obtain and save file path
+            file = path.split(file)[1]
+            self.sprite.name = path.splitext(file)[0]
+            file = path.join("entities", file)
+            self.file_path = file
+
+        if self.view_name in App.project_data["sprites"]:
+            print(file)
+            relative_path = file.replace((getcwd() + '/').replace('\\', '/'), '')
+            App.project_data["sprites"][self.view_name]["path"] = relative_path
+
+        # Write json tag to file
+        with open(file, mode="w") as f:
+            f.write(self.sprite.jsonify())
+        self.saved = True
+        self.update_title()
+
+    def update_title(self):
+        """Update the view title"""
+        # If not saved, add an asterisk in front of the displayed name
+        if self.saved:
+            self.master.tab(self, text=self.view_name)
+        else:
+            self.master.tab(self, text="*" + self.view_name)
+
 
 
 @dataclass
@@ -3315,6 +3692,11 @@ class SpriteStats:
 
 
 class Sprite:
+    name: str
+    focus: bool
+    path_type: int
+    path_delay: int
+    facing_type: int
 
     def __init__(self):
         self.name = ""
@@ -3326,34 +3708,41 @@ class Sprite:
         self.facing_type = 0
         self.animation = {}
         self.stats = SpriteStats()
+        self.ignore_from_project = False
 
     def load_from_json(self, json_dict):
         """Load a sprite from a json dictionary"""
-        self.name = json_dict["name"]
-        self.world_data.level = json_dict["world_data"]["level"]
-        self.world_data.scope = json_dict["world_data"]["scope"]
-        self.focus = json_dict["focus"]
-        self.position = SpritePosition(x=json_dict["position"]["x"],
-                                       y=json_dict["position"]["y"],
-                                       z=json_dict["position"]["z"],
-                                       base_speed=json_dict["position"]["base_speed"],
-                                       auto_size=json_dict["position"]["auto_size"],
-                                       w=json_dict["position"]["w"],
-                                       h=json_dict["position"]["h"],
-                                       collide=json_dict["position"]["collide"])
-        self.path_type = json_dict["path_type"]
-        self.path_delay = json_dict["path_delay"]
-        self.facing_type = json_dict["facing_type"]
-        self.animation = {}
-        for animation_id, animation_data in json_dict["animation"].items():
-            self.animation[animation_id] = SpriteAnimation(root_path=animation_data["root_path"],
-                                                           images=animation_data["images"],
-                                                           sequence=animation_data["sequence"],
-                                                           frame_time=animation_data["frame_time"],
-                                                           scale_factor=animation_data["scale_factor"])
-        self.stats = SpriteStats(invulnerable=json_dict["stats"]["invulnerable"],
-                                 speed_modifier=json_dict["stats"]["speed_modifier"],
-                                 health=json_dict["stats"]["health"])
+        try:
+            self.name = json_dict["name"]
+            self.world_data.level = json_dict["world_data"]["level"]
+            self.world_data.scope = json_dict["world_data"]["scope"]
+            self.focus = json_dict["focus"]
+            self.position = SpritePosition(x=json_dict["position"]["x"],
+                                           y=json_dict["position"]["y"],
+                                           z=json_dict["position"]["z"],
+                                           base_speed=json_dict["position"]["base_speed"],
+                                           auto_size=json_dict["position"]["auto_size"],
+                                           w=json_dict["position"]["w"],
+                                           h=json_dict["position"]["h"],
+                                           collide=json_dict["position"]["collide"])
+            self.path_type = json_dict["path_type"]
+            self.path_delay = json_dict["path_delay"]
+            self.facing_type = json_dict["facing_type"]
+            self.animation = {}
+            for animation_id, animation_data in json_dict["animation"].items():
+                self.animation[animation_id] = SpriteAnimation(root_path=animation_data["root_path"],
+                                                               images=animation_data["images"],
+                                                               sequence=animation_data["sequence"],
+                                                               frame_time=animation_data["frame_time"],
+                                                               scale_factor=animation_data["scale_factor"])
+            self.stats = SpriteStats(invulnerable=json_dict["stats"]["invulnerable"],
+                                     speed_modifier=json_dict["stats"]["speed_modifier"],
+                                     health=json_dict["stats"]["health"])
+            return True
+        except KeyError as error:
+            messagebox.showerror("Error", f'An error occurred while loading this sprite:'
+                                          f' could not find component {error}')
+            return False
 
     def jsonify(self):
         """Convert sprite data to a formatted json string"""
@@ -3366,7 +3755,7 @@ class Sprite:
                              "path_delay": self.path_delay,
                              "facing_type": self.facing_type,
                              "animation": dict((i, j.__dict__) for i, j in self.animation.items()),
-                             "stats": self.world_data.__dict__},
+                             "stats": self.stats.__dict__},
                             indent=4)
 
         # Format the json string using regular expressions
@@ -3446,7 +3835,7 @@ class App:
         # Create the various editing windows
         self.tilemap_editor = TilemapEditorWindow(self.source)
         self.world_editor = WorldEditorWindow(self.source, borderwidth=1, relief=tk.SUNKEN)
-        self.sprite_editor = SpriteEditorWindow(self.source, borderwidth=1, relief=tk.SUNKEN)
+        self.sprite_editor = SpriteEditorWindow(self.source)
         self.notepad = NotesEditorWindow(self.source, borderwidth=1, relief=tk.SUNKEN)
 
         self.source.pack(expand=1, fill="both")
@@ -3465,9 +3854,13 @@ class App:
         self.menubar = tk.Menu(self.source.master)
         # Tilemap editor window toolbar
         if value == 0:
-            # self.menubar = self.tilemap_editor.menubar
+            # Tilemap editor menubar
             self.source.master.config(menu=self.tilemap_editor.menubar)
+        elif value == 2:
+            # Sprite editor menubar
+            self.source.master.config(menu=self.sprite_editor.menubar)
         else:
+            # Default menubar
             self.source.master.config(menu=self.menubar)
 
     @classmethod
