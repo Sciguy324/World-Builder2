@@ -1105,7 +1105,8 @@ class TilemapEditorWindow(tk.Frame):
     def open_map(self, file):
         """Open a level in a new view"""
         self.new_view()
-        self.view_list[self.tilemap_panel.index("current")].load_from_file(file)
+        if not self.view_list[self.tilemap_panel.index("current")].load_from_file(file):
+            self._close_view()
 
     @Decorators.hidden_event
     def _save_map(self):
@@ -2398,17 +2399,18 @@ class TilemapView(tk.Frame):
 
     def load_from_file(self, file):
         """Loads level data from a .json file"""
-        # TODO: Add function to check if data is formatted correctly
         self.backup_state()
         with open(file, mode="r") as f:
             level_data = json.load(f)
-            self.level.load_from_json(level_data)
+            if not self.level.load_from_json(level_data):
+                return False
             self.saved = True
             self.file_path = file
         self.set_border(self.master.master.border_mode.get())
         self.update_title()
         self.apply_geometry()
         self.redraw_view()
+        return True
 
     def quick_save(self):
         """Saves the level data to the file defined by self.file_path"""
@@ -2422,7 +2424,6 @@ class TilemapView(tk.Frame):
             ids_data = json.dumps(TilemapEditorWindow.ids_data, indent=2)
             ids_data = re.sub(r'\[\s+(\d),\s+(\d),\s+(\d),\s+(\d)\s+\]', r'[\1, \2, \3, \4]', ids_data)
             f.write(ids_data)
-        # TODO: Save excluded levels to project.json?
         # If this file is NOT part of the project and hasn't been excluded, ask whether it should be.
         print(self.level.ignore_from_project)
         if not self.level.ignore_from_project:
@@ -2587,36 +2588,45 @@ class Level:
 
     def load_from_json(self, data):
         """Load level data from a JSON representation"""
-        self.tilemap = data["tilemap"]
-        self.level_width = len(self.tilemap[0])
-        self.level_height = len(self.tilemap)
-        self.decomap = Decomap()
-        # Note: This is still here in case I ever need to upgrade an older map
-        #        for i, j in enumerate(data["decomap"]):
-        #            for k, m in enumerate(j):
-        #                if m != 0:
-        #                    self.decomap.add(k, i, m)
-        for i, j, k in data["decomap"]:
-            self.decomap.add(j, k, i)
+        try:
+            self.tilemap = data["tilemap"]
+            self.level_width = len(self.tilemap[0])
+            self.level_height = len(self.tilemap)
+            self.decomap = Decomap()
+            # Note: This is still here in case I ever need to upgrade an older map
+            #        for i, j in enumerate(data["decomap"]):
+            #            for k, m in enumerate(j):
+            #                if m != 0:
+            #                    self.decomap.add(k, i, m)
+            for i, j, k in data["decomap"]:
+                self.decomap.add(j, k, i)
 
-        self.collider = [[0] * (self.level_width * 2) for i in range(self.level_height * 2)]
-        self.loading_zones = LoadingZoneDict()
-        for i in data["loading_zones"]:
-            self.loading_zones[i["zone"][0], i["zone"][1]] = LoadingZone(i["target_level"], i["target_pos"])
-        for i in data["lightmap"]:
-            red = ColorFade(i["red"]["amplitude"], i["red"]["inner_diameter"], i["red"]["outer_diameter"])
-            green = ColorFade(i["green"]["amplitude"], i["green"]["inner_diameter"], i["green"]["outer_diameter"])
-            blue = ColorFade(i["blue"]["amplitude"], i["blue"]["inner_diameter"], i["blue"]["outer_diameter"])
-            self.lightmap[i["pos"][0], i["pos"][1]] = Light(i["diameter"], red, green, blue, i["blacklight"], True)
-        self.default_start = data["spawn"]
-        self.name = data["name"]
-        if self.name in App.project_data["levels"]:
-            self.world_pos = App.project_data["levels"][self.name]["world_pos"]
-        else:
-            try:
-                self.world_pos = data["world_pos"]
-            except KeyError:
-                self.world_pos = [0, 0]
+            self.collider = [[0] * (self.level_width * 2) for i in range(self.level_height * 2)]
+            self.loading_zones = LoadingZoneDict()
+            for i in data["loading_zones"]:
+                self.loading_zones[i["zone"][0], i["zone"][1]] = LoadingZone(i["target_level"], i["target_pos"])
+            for i in data["lightmap"]:
+                red = ColorFade(i["red"]["amplitude"], i["red"]["inner_diameter"], i["red"]["outer_diameter"])
+                green = ColorFade(i["green"]["amplitude"], i["green"]["inner_diameter"], i["green"]["outer_diameter"])
+                blue = ColorFade(i["blue"]["amplitude"], i["blue"]["inner_diameter"], i["blue"]["outer_diameter"])
+                self.lightmap[i["pos"][0], i["pos"][1]] = Light(i["diameter"], red, green, blue, i["blacklight"], True)
+            self.default_start = data["spawn"]
+            self.name = data["name"]
+            if self.name in App.project_data["levels"]:
+                # If level was found in project.json, prioritize that.
+                self.world_pos = App.project_data["levels"][self.name]["world_pos"]
+            else:
+                try:
+                    # If the level was not found in project.json, use the value reported by the level file
+                    self.world_pos = data["world_pos"]
+                except KeyError:
+                    # No world position was found, default to [0, 0]
+                    self.world_pos = [0, 0]
+                    messagebox.showerror("Error", "No world_pos tag was found, defaulting to [0, 0]")
+        except KeyError as error:
+            messagebox.showerror("Error", f'Failed to load level, an issue was detected with \'{error}\'')
+            return False
+        return True
 
     def copy(self):
         """Return a copy of the level data"""
@@ -3304,16 +3314,21 @@ class SpriteEditorWindow(tk.Frame):
         self.filemenu = tk.Menu(self.menubar)
         self.filemenu.add_command()
 
-        # TODO: Add keybindings
         self.filemenu = tk.Menu(self.menubar, tearoff=0)
         self.filemenu.add_command(label="Open Sprite (Ctrl-O)", command=self.open_sprite)
         self.filemenu.add_command(label="Save Sprite (Ctrl-S)", command=lambda: self.save_sprite(False))
         self.filemenu.add_command(label="Save Sprite As (Ctrl-Shift-S)", command=lambda: self.save_sprite(True))
         self.filemenu.add_command(label="New Sprite (Ctrl-N)", command=self.new_view)
         self.filemenu.add_command(label="Close Sprite (Ctrl-W)", command=self.close_view)
-        #self.filemenu.add_separator()
-        #self.filemenu.add_command(label="Settings", command=self.unimplemented)
         self.menubar.add_cascade(label="File", menu=self.filemenu)
+
+        # Add keybindings
+        # TODO: Prevent these keybindings from interfering with other tabs
+        # parent.master.bind("<Control-o>", lambda event: self.open_sprite())
+        # parent.master.bind("<Control-s>", lambda event: self.save_sprite(False))
+        # parent.master.bind("<Control-S>", lambda event: self.save_sprite(True))
+        # parent.master.bind("<Control-n>", lambda event: self.new_view())
+        # parent.master.bind("<Control-w>", lambda event: self.close_view(self.editing_notebook.index("current")))
 
         # Launch default untitled view
         self.new_view(ignore_viewable=True)
@@ -3345,7 +3360,7 @@ class SpriteEditorWindow(tk.Frame):
         """Save a sprite to a file"""
         if self.master.index("current") != 2:
             return
-        self.view_list[-1].save(save_as)
+        self.view_list[self.editing_notebook.index("current")].save(save_as)
 
     def new_view(self, ignore_viewable=False):
         """Create a new, blank view"""
@@ -3431,19 +3446,21 @@ class LabeledEntry:
 
 class CategoryEditor(tk.LabelFrame):
 
-    def __init__(self, parent, title, sprite_data_reference, **kwargs):
+    def __init__(self, parent, title, sprite_data_reference, modify_callback, **kwargs):
         super().__init__(parent, text=title, **kwargs)
 
         self.sprite_data_reference = sprite_data_reference
+        self.modify_callback = modify_callback
         self.entries = {}
         for i, (var, var_type) in enumerate(sprite_data_reference.__annotations__.items()):
             label = var.replace('_', ' ').title()
             self.entries[var] = LabeledEntry(self, i, label, var, var_type, self.modify_value)
 
     def modify_value(self, variable_name, value):
-        """Override in subclass"""
+        """Modify the sprite data"""
         if variable_name in self.sprite_data_reference.__dict__:
             self.sprite_data_reference.__dict__[variable_name] = value
+            self.modify_callback()
 
     def update_from_sprite(self, data_dict):
         """Insert data from a dictionary representing a sprite's attributes"""
@@ -3505,19 +3522,19 @@ class SpriteView(ttk.Frame):
         # self.facing_type_entry = LabeledEntry(self.general_frame, 4, "Facing Type", "facing_type", self.modify_generic)
 
         # Create the general-purpose editing window
-        self.general_table = CategoryEditor(self.window, "General", self.sprite)
+        self.general_table = CategoryEditor(self.window, "General", self.sprite, self.modified)
         self.general_table.pack(fill=tk.X, expand=1)
 
         # Create the world data editing window
-        self.world_table = CategoryEditor(self.window, "World Data", self.sprite.world_data)
+        self.world_table = CategoryEditor(self.window, "World Data", self.sprite.world_data, self.modified)
         self.world_table.pack(fill=tk.X, expand=1)
 
         # Create the position editing window
-        self.position_table = CategoryEditor(self.window, "Positioning", self.sprite.position)
+        self.position_table = CategoryEditor(self.window, "Positioning", self.sprite.position, self.modified)
         self.position_table.pack(fill=tk.X, expand=1)
 
         # Create the stats editing window
-        self.stats_table = CategoryEditor(self.window, "Stats", self.sprite.stats)
+        self.stats_table = CategoryEditor(self.window, "Stats", self.sprite.stats, self.modified)
         self.stats_table.pack(fill=tk.X, expand=1)
 
         self.update()
@@ -3529,15 +3546,10 @@ class SpriteView(ttk.Frame):
         self.scrollable_canvas.config(scrollregion=self.scrollable_canvas.bbox("all"),
                                       yscrollcommand=self.scrollbar.set)
 
-    def modify_generic(self, entry_name, value):
-        """Event callback for a general-type entry being modified.  Value is trusted to be valid"""
-        if entry_name in self.sprite.__dict__:
-            self.sprite.__dict__[entry_name] = value
-
-    def modify_world_data(self, entry_name, value):
-        """Event callback for a general-type entry being modified.  Value is trusted to be valid"""
-        if entry_name in self.sprite.world_data.__dict__:
-            self.sprite.world_data.__dict__[entry_name] = value
+    def modified(self):
+        """Indicate that the sprite data was modified"""
+        self.saved = False
+        self.update_title()
 
     def close(self, ignore_saved=False):
         """Destroy this sprite-view"""
@@ -3646,7 +3658,6 @@ class SpriteView(ttk.Frame):
             self.master.tab(self, text=self.view_name)
         else:
             self.master.tab(self, text="*" + self.view_name)
-
 
 
 @dataclass
@@ -3834,6 +3845,7 @@ class App:
 
         # Add toolbar
         self.menubar = tk.Menu(parent)
+        self.update_toolbar(0)
 
         # Add event listener to update the toolbar
         self.source.bind("<<NotebookTabChanged>>",
@@ -3842,7 +3854,7 @@ class App:
     def update_toolbar(self, value):
         """Updates the toolbar to match the current tab"""
         self.world_editor.reload()  # Ensure the world editor is reloaded.  I don't like putting this here.  Not Funland
-        self.sprite_editor.reload() # Ensure the sprite editor is reloaded.
+        self.sprite_editor.reload()  # Ensure the sprite editor is reloaded.
         self.menubar.forget()
         self.menubar = tk.Menu(self.source.master)
         # Tilemap editor window toolbar
