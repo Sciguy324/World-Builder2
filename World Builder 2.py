@@ -3368,118 +3368,87 @@ class SpriteEditorWindow(tk.Frame):
             # Attempt to close view was not interrupted by user (such as by clicking "cancel" in an unsaved view)
             del self.view_list[index]
 
+    def reload(self):
+        """Reload all the views"""
+        for view in self.view_list:
+            view.reload_region()
+
 
 class LabeledEntry:
 
     def __init__(self, parent, row, label, variable_name, variable_type, function):
 
-        self.ignore_callback = True
+        self.ignore_callback = False
 
         # Save some variables
         self.variable_name = variable_name
         self.variable_type = variable_type
 
-        # Create text variable
-        self.text_before = ""
-        self.text_var = tk.StringVar(parent, "", f'{variable_name}_text')
-        self.text_var.trace('w', lambda name, index, op, x=function: self.entry_callback(x))
+        if self.variable_type == bool:
+            # Create data variable (boolean)
+            self.data_before = False
+            self.data_var = tk.BooleanVar(parent, False)
+            # Create the checkbox
+            self.entry = tk.Checkbutton(parent, variable=self.data_var)
+        else:
+            # Create data variable (string)
+            self.data_before = ""
+            self.data_var = tk.StringVar(parent, "")
+            # Create the entry box
+            self.entry = tk.Entry(parent, textvariable=self.data_var)
+
+        # Add the callback to the data variable
+        self.data_var.trace('w', lambda name, index, op, x=function: self.entry_callback(x))
 
         # Create the label
         self.label = tk.Label(parent, text=f'{label}:')
         self.label.grid(row=row, column=0, sticky=tk.W)
 
-        # Create the entry box
-        self.name_entry = tk.Entry(parent, textvariable=self.text_var)
-        self.name_entry.grid(row=row, column=1, padx=4)
+        # Place the entry box
+        self.entry.grid(row=row, column=1, padx=4, sticky=tk.W)
 
     def entry_callback(self, function):
         """Event callback for when the entry text is modified"""
         if self.ignore_callback:
             return
-        if len(self.text_var.get()) != 0:
+        if len(str(self.data_var.get())) != 0:
             try:
-                text = self.variable_type(self.text_var.get())
+                text = self.variable_type(self.data_var.get())
             except ValueError:
                 messagebox.showerror("Error", "Invalid entry")
+                self.ignore_callback = True
+                self.data_var.set(self.data_before)
+                self.ignore_callback = False
             else:
-                self.text_before = self.text_var.get()
+                self.data_before = self.data_var.get()
                 function(self.variable_name, text)
 
     def insert_data(self, value):
         self.ignore_callback = True
-        self.text_var.set(value)
+        self.data_var.set(value)
         self.ignore_callback = False
 
 
 class CategoryEditor(tk.LabelFrame):
 
-    def __init__(self, parent, title, label_type_dict, **kwargs):
+    def __init__(self, parent, title, sprite_data_reference, **kwargs):
         super().__init__(parent, text=title, **kwargs)
 
+        self.sprite_data_reference = sprite_data_reference
         self.entries = {}
-        for i, (var, var_type) in enumerate(label_type_dict.items()):
+        for i, (var, var_type) in enumerate(sprite_data_reference.__annotations__.items()):
             label = var.replace('_', ' ').title()
             self.entries[var] = LabeledEntry(self, i, label, var, var_type, self.modify_value)
 
     def modify_value(self, variable_name, value):
         """Override in subclass"""
-        pass
+        if variable_name in self.sprite_data_reference.__dict__:
+            self.sprite_data_reference.__dict__[variable_name] = value
 
-    def update_from_sprite(self):
-        """Override in subclass"""
-        pass
-
-
-class GeneralEditor(CategoryEditor):
-
-    def modify_value(self, variable_name, value):
-        """Event callback for a general-type entry being modified.  Value is trusted to be valid"""
-        if variable_name in self.master.sprite.__dict__:
-            self.master.sprite.__dict__[variable_name] = value
-
-    def update_from_sprite(self):
-        """Insert data from the sprite"""
+    def update_from_sprite(self, data_dict):
+        """Insert data from a dictionary representing a sprite's attributes"""
         for i, j in self.entries.items():
-            j.insert_data(self.master.sprite.__dict__[i])
-
-
-class WorldDataEditor(CategoryEditor):
-
-    def modify_value(self, variable_name, value):
-        """Event callback for a general-type entry being modified.  Value is trusted to be valid"""
-        if variable_name in self.master.sprite.world_data.__dict__:
-            self.master.sprite.world_data.__dict__[variable_name] = value
-
-    def update_from_sprite(self):
-        """Insert data from the sprite"""
-        for i, j in self.entries.items():
-            j.insert_data(self.master.sprite.world_data.__dict__[i])
-
-
-class PositionEditor(CategoryEditor):
-
-    def modify_value(self, variable_name, value):
-        """Event callback for a general-type entry being modified.  Value is trusted to be valid"""
-        if variable_name in self.master.sprite.position.__dict__:
-            self.master.sprite.position.__dict__[variable_name] = value
-
-    def update_from_sprite(self):
-        """Insert data from the sprite"""
-        for i, j in self.entries.items():
-            j.insert_data(self.master.sprite.position.__dict__[i])
-
-
-class StatsEditor(CategoryEditor):
-
-    def modify_value(self, variable_name, value):
-        """Event callback for a general-type entry being modified.  Value is trusted to be valid"""
-        if variable_name in self.master.sprite.stats.__dict__:
-            self.master.sprite.world_data.__dict__[variable_name] = value
-
-    def update_from_sprite(self):
-        """Insert data from the sprite"""
-        for i, j in self.entries.items():
-            j.insert_data(self.master.sprite.stats.__dict__[i])
+            j.insert_data(data_dict[i])
 
 
 class SpriteView(ttk.Frame):
@@ -3500,8 +3469,25 @@ class SpriteView(ttk.Frame):
         # Declare sprite
         self.sprite = Sprite()
 
+        # Add to parent widget
+        parent.add(self, text=self.view_name)
+
+        # Create scrollbar
+        self.scrollable_canvas = tk.Canvas(self)
+        self.scrollable_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=1)
+
+        self.window = tk.Frame(self.scrollable_canvas)
+        self.scrollable_canvas.create_window((0, 0), window=self.window, anchor="nw")
+
+        self.scrollbar = tk.Scrollbar(self, orient=tk.VERTICAL, command=self.scrollable_canvas.yview)
+        self.scrollbar.activate("slider")
+
+        self.scrollbar.pack(side=tk.LEFT, fill=tk.Y, expand=0)
+
+        self.scrollable_canvas.yview(tk.MOVETO, 0.0)
+
         # Create animation window
-        self.animation_frame = tk.LabelFrame(self, text="Animations")
+        self.animation_frame = tk.LabelFrame(self.window, text="Animations")
         self.animation_frame.pack(fill=tk.X, expand=1)
 
         self.animation_canvas = tk.Canvas(self.animation_frame, width=256, height=256, bg="WHITE", bd=1)
@@ -3519,23 +3505,29 @@ class SpriteView(ttk.Frame):
         # self.facing_type_entry = LabeledEntry(self.general_frame, 4, "Facing Type", "facing_type", self.modify_generic)
 
         # Create the general-purpose editing window
-        self.general_table = GeneralEditor(self, "General", self.sprite.__annotations__)
+        self.general_table = CategoryEditor(self.window, "General", self.sprite)
         self.general_table.pack(fill=tk.X, expand=1)
 
         # Create the world data editing window
-        self.world_table = WorldDataEditor(self, "World Data", self.sprite.world_data.__annotations__)
+        self.world_table = CategoryEditor(self.window, "World Data", self.sprite.world_data)
         self.world_table.pack(fill=tk.X, expand=1)
 
         # Create the position editing window
-        self.position_table = PositionEditor(self, "Positioning", self.sprite.position.__annotations__)
+        self.position_table = CategoryEditor(self.window, "Positioning", self.sprite.position)
         self.position_table.pack(fill=tk.X, expand=1)
 
         # Create the stats editing window
-        self.stats_table = StatsEditor(self, "Stats", self.sprite.stats.__annotations__)
+        self.stats_table = CategoryEditor(self.window, "Stats", self.sprite.stats)
         self.stats_table.pack(fill=tk.X, expand=1)
 
-        # Add to parent widget
-        parent.add(self, text=self.view_name)
+        self.update()
+        self.reload_region()
+
+    def reload_region(self):
+        """Reload the scroll-region"""
+        # Configure the scroll-region
+        self.scrollable_canvas.config(scrollregion=self.scrollable_canvas.bbox("all"),
+                                      yscrollcommand=self.scrollbar.set)
 
     def modify_generic(self, entry_name, value):
         """Event callback for a general-type entry being modified.  Value is trusted to be valid"""
@@ -3584,10 +3576,10 @@ class SpriteView(ttk.Frame):
         self.update_title()
 
         # Sync data from sprite to entries
-        self.general_table.update_from_sprite()
-        self.world_table.update_from_sprite()
-        self.position_table.update_from_sprite()
-        self.stats_table.update_from_sprite()
+        self.general_table.update_from_sprite(self.sprite.__dict__)
+        self.world_table.update_from_sprite(self.sprite.world_data.__dict__)
+        self.position_table.update_from_sprite(self.sprite.position.__dict__)
+        self.stats_table.update_from_sprite(self.sprite.stats.__dict__)
 
         return True
 
@@ -3850,6 +3842,7 @@ class App:
     def update_toolbar(self, value):
         """Updates the toolbar to match the current tab"""
         self.world_editor.reload()  # Ensure the world editor is reloaded.  I don't like putting this here.  Not Funland
+        self.sprite_editor.reload() # Ensure the sprite editor is reloaded.
         self.menubar.forget()
         self.menubar = tk.Menu(self.source.master)
         # Tilemap editor window toolbar
