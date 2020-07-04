@@ -945,7 +945,6 @@ class TilemapEditorWindow(tk.Frame):
 
         # Add the group tracking variable
         self.group = tk.StringVar(self, "", "selected_group")
-        # TODO: Should this line exist?
         self.group.trace("w", lambda name, index, op: self.set_pane(self.group.get(), self.layer.get()))
 
         # Add the selected layer tracking variable
@@ -999,26 +998,25 @@ class TilemapEditorWindow(tk.Frame):
                                      borderwidth=1, relief=tk.SUNKEN, padx=5, pady=5)
         self.level_coords.grid(row=0, column=14, sticky=tk.W)
 
-        # TODO: Find a more efficient way of limiting the scope of these keybindings
         # Set up tool keybindings
-        parent.master.bind("<Key-1>", self.keybind_draw_mode)
-        parent.master.bind("<Key-2>", self.keybind_move_mode)
-        parent.master.bind("<Key-3>", self.keybind_grid_mode)
-        parent.master.bind("<Key-4>", self.keybind_border_mode)
+        self.keybindings = {"<Key-1>": self.keybind_draw_mode,
+                            "<Key-2>": self.keybind_move_mode,
+                            "<Key-3>": self.keybind_grid_mode,
+                            "<Key-4>": self.keybind_border_mode}
 
         # Set up the layer keybindings
         for i in range(5, 10):
-            parent.master.bind("<Key-{}>".format(i), self.keybind_layer_mode)
-        parent.master.bind("<Key-0>", self.keybind_layer_mode)
+            self.keybindings[f'<Key-{i}>'] = self.keybind_layer_mode
+        self.keybindings["<Key-0>"] = self.keybind_layer_mode
 
         # Set up menubar keybindings
-        parent.master.bind("<Control-o>", self._open_map)
-        parent.master.bind("<Control-s>", self._save_map)
-        parent.master.bind("<Control-S>", self._save_map_as)
-        parent.master.bind("<Control-n>", self.new_view)
-        parent.master.bind("<Control-w>", self._close_view)
-        parent.master.bind("<Control-z>", self.undo)
-        parent.master.bind("<Control-y>", self.redo)
+        self.keybindings["<Control-o>"] = self._open_map
+        self.keybindings["<Control-s>"] = self._save_map
+        self.keybindings["<Control-S>"] = self._save_map_as
+        self.keybindings["<Control-n>"] = self.new_view
+        self.keybindings["<Control-w>"] = self._close_view
+        self.keybindings["<Control-z>"] = self.undo
+        self.keybindings["<Control-y>"] = self.redo
 
         # Set up level viewing section
         self.tilemap_panel = CustomNotebook(self)
@@ -2418,7 +2416,6 @@ class TilemapView(tk.Frame):
 
     def save_to_file(self, file):
         """Saves the level data to a .json file"""
-        # TODO: Test if saved files are actually loadable in engine.
         # Save the ids_data to ids.json
         with open("assets/ids.json", mode="w") as f:
             ids_data = json.dumps(TilemapEditorWindow.ids_data, indent=2)
@@ -3323,12 +3320,11 @@ class SpriteEditorWindow(tk.Frame):
         self.menubar.add_cascade(label="File", menu=self.filemenu)
 
         # Add keybindings
-        # TODO: Prevent these keybindings from interfering with other tabs
-        # parent.master.bind("<Control-o>", lambda event: self.open_sprite())
-        # parent.master.bind("<Control-s>", lambda event: self.save_sprite(False))
-        # parent.master.bind("<Control-S>", lambda event: self.save_sprite(True))
-        # parent.master.bind("<Control-n>", lambda event: self.new_view())
-        # parent.master.bind("<Control-w>", lambda event: self.close_view(self.editing_notebook.index("current")))
+        self.keybindings = {"<Control-o>": lambda event: self.open_sprite(),
+                            "<Control-s>": lambda event: self.save_sprite(False),
+                            "<Control-S>": lambda event: self.save_sprite(True),
+                            "<Control-n>": lambda event: self.new_view(),
+                            "<Control-w>": lambda event: self.close_view(self.editing_notebook.index("current"))}
 
         # Launch default untitled view
         self.new_view(ignore_viewable=True)
@@ -3845,25 +3841,29 @@ class App:
 
         # Add toolbar
         self.menubar = tk.Menu(parent)
-        self.update_toolbar(0)
+        self.switch_tab(0)
 
         # Add event listener to update the toolbar
         self.source.bind("<<NotebookTabChanged>>",
-                         lambda event: self.update_toolbar(self.source.index("current")))
+                         lambda event: self.switch_tab(self.source.index("current")))
 
-    def update_toolbar(self, value):
+    def switch_tab(self, value):
         """Updates the toolbar to match the current tab"""
-        self.world_editor.reload()  # Ensure the world editor is reloaded.  I don't like putting this here.  Not Funland
+        self.world_editor.reload()  # Ensure the world editor is reloaded.
         self.sprite_editor.reload()  # Ensure the sprite editor is reloaded.
         self.menubar.forget()
         self.menubar = tk.Menu(self.source.master)
         # Tilemap editor window toolbar
         if value == 0:
-            # Tilemap editor menubar
+            # Tilemap editor menubar + keybindings
             self.source.master.config(menu=self.tilemap_editor.menubar)
+            for key, func in self.tilemap_editor.keybindings.items():
+                self.source.master.bind(key, func)
         elif value == 2:
-            # Sprite editor menubar
+            # Sprite editor menubar + keybindings
             self.source.master.config(menu=self.sprite_editor.menubar)
+            for key, func in self.sprite_editor.keybindings.items():
+                self.source.master.bind(key, func)
         else:
             # Default menubar
             self.source.master.config(menu=self.menubar)
