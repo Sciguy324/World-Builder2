@@ -10,6 +10,12 @@ import re
 from dataclasses import dataclass, field
 from typing import List
 
+from sys import platform
+
+if platform == 'win32':
+    from ctypes import windll
+    #windll.shcore.SetProcessDpiAwareness(1)
+
 
 class ScrollbarEntry(tk.Frame):
     """Class for entries that follow the format Label, Scrollbar, Entry"""
@@ -700,6 +706,7 @@ class GroupEditorGroup(tk.Frame):
 
 
 # TODO: Refactor ids list
+# TODO: Convert layers into their own classes
 
 class CustomButton(ttk.Button):
     """A ttk button that has special effects"""
@@ -1456,7 +1463,7 @@ class TilemapEditorWindow(tk.Frame):
                                                       relief=tk.SUNKEN)}
 
         self.panes["loading"] = {"All": TileCollection(self.selection_frame,
-                                                       [0, 1, 2, 3, 4, 5],
+                                                       [0, 1, 2, 3, 4, 5, 6],
                                                        "loading",
                                                        borderwidth=1,
                                                        relief=tk.SUNKEN)}
@@ -1621,6 +1628,11 @@ class TilemapEditorWindow(tk.Frame):
             JSb2HSMpoNRAAA7
             '''
 
+        goto_level = '''R0lGODlhEAAQAMIAAAAAAP9ZAP9zAP+LAP+gAP+xPAAAAAAAACH5BAEK
+            AAcALAAAAAAQABAAAANF\nSHSn7G2xSeubIGs9IRhFFgQCQElAoYqldaRqSJoXA69zh8
+            Zy29k8QM4CAwl9DUxwGLGBcMjk67Zx\nTVcWCYZTUUggYEkCADs=
+            '''
+
         new_light = '''R0lGODlhEAAQAMIEAAAAAFVVVaqqquzkAADhAADhAADhAADhACH5BAEKA
             AQALAAAAAAQABAAAAM0\nOEOk7G2xSeuzCk7dqNxgd1ldNorjp35o27IsKcUxAShAxdl
             Aj1WAgCBHAhI9RRlkOZMkAAA7
@@ -1656,6 +1668,7 @@ class TilemapEditorWindow(tk.Frame):
                     "copy": tk.PhotoImage("img_copy", data=copy_zone).zoom(64).subsample(16),
                     "paste": tk.PhotoImage("img_paste", data=paste_zone).zoom(64).subsample(16),
                     "extend_zone": tk.PhotoImage("img_paste_zone", data=extend_zone).zoom(64).subsample(16),
+                    "goto_level": tk.PhotoImage("img_goto_level", data=goto_level).zoom(64).subsample(16),
                     "new_light": tk.PhotoImage("img_new_light", data=new_light).zoom(64).subsample(16),
                     "edit_light": tk.PhotoImage("img_edit_light", data=edit_light).zoom(64).subsample(16)
                     }
@@ -1675,7 +1688,8 @@ class TilemapEditorWindow(tk.Frame):
                             cls.imgs["configure_zone"],
                             cls.imgs["copy"],
                             cls.imgs["paste"],
-                            cls.imgs["extend_zone"]
+                            cls.imgs["extend_zone"],
+                            cls.imgs["goto_level"]
                             ]
 
         cls.light_dict = [cls.imgs["delete"],
@@ -1738,6 +1752,8 @@ class TilemapView(tk.Frame):
         # Declare some variables for view settings
         self.start_x = 0
         self.start_y = 0
+        self.line_start_x = 0
+        self.line_start_y = 0
         self.saved = True
         self.current_tile = 0
         self.copied_zone = None
@@ -1977,42 +1993,60 @@ class TilemapView(tk.Frame):
         """Does the actual work of setting the window's mode"""
         if value == 0:
             # Drawing controls
-            for i in ["<ButtonPress-1>", "<B1-Motion>", "<ButtonRelease-1>"]:
+            for i in ["<ButtonPress-1>", "<B1-Motion>", "<ButtonRelease-1>", "<ButtonPress-2>", "<B2-Motion>"
+                      "<ButtonRelease-2>"]:
                 self.canvas.unbind(i)
+            self.canvas.bind("<ButtonPress-2>", self.draw_line_start)
+            self.canvas.bind("<B2-Motion>", self.draw_line_move)
+
             # Tilemap mode
             if self.master.master.layer.get() == 0:
                 self.canvas.bind("<B1-Motion>", self.draw_tile)
                 self.canvas.bind("<ButtonRelease-1>", lambda event: self._generic_finish_draw(event, self.draw_tile))
                 self.canvas.bind("<ButtonPress-1>", lambda event: self._generic_start_draw(event, self.draw_tile))
+                self.canvas.bind("<ButtonRelease-2>", lambda event: self.draw_line_finish(event, self.draw_tile))
+
             # Decomap mode
             elif self.master.master.layer.get() == 1:
                 self.canvas.bind("<B1-Motion>", self.draw_deco)
                 self.canvas.bind("<ButtonRelease-1>", lambda event: self._generic_finish_draw(event, self.draw_deco))
                 self.canvas.bind("<ButtonPress-1>", lambda event: self._generic_start_draw(event, self.draw_deco))
+                self.canvas.bind("<ButtonRelease-2>", lambda event: self.draw_line_finish(event, self.draw_deco))
+
             # Collision map mode
             elif self.master.master.layer.get() == 2:
                 self.canvas.bind("<B1-Motion>", self.draw_collider)
                 self.canvas.bind("<ButtonRelease-1>",
                                  lambda event: self._generic_finish_draw(event, self.draw_collider))
                 self.canvas.bind("<ButtonPress-1>", lambda event: self._generic_start_draw(event, self.draw_collider))
+                self.canvas.unbind("<ButtonPress-2>")
+                self.canvas.unbind("<B2-Motion>")
+
             # Height map mode
             elif self.master.master.layer.get() == 3:
                 self.canvas.bind("<ButtonRelease-1>", lambda event: self.redraw_view())
                 self.canvas.bind("<ButtonPress-1>", lambda event: self._generic_start_draw(event, self.draw_height))
+                self.canvas.bind("<ButtonRelease-2>", lambda event: self.draw_line_finish(event, self.draw_height))
+
             # Loading zone mode
             elif self.master.master.layer.get() == 4:
-                self.canvas.bind("<B1-Motion>", self.draw_zone)
+                self.canvas.bind("<B1-Motion>", lambda event: self.draw_zone(event, True))
                 self.canvas.bind("<ButtonRelease-1>", lambda event: self._generic_finish_draw(event, self.draw_zone))
                 self.canvas.bind("<ButtonPress-1>", lambda event: self._generic_start_draw(event, self.draw_zone))
+                self.canvas.bind("<ButtonRelease-2>", lambda event: self.draw_line_finish(event, self.draw_zone))
+
             # Lightmap mode
             elif self.master.master.layer.get() == 5:
                 self.canvas.bind("<B1-Motion>", self.draw_light)
                 self.canvas.bind("<ButtonRelease-1>", lambda event: self._generic_finish_draw(event, self.draw_light))
                 self.canvas.bind("<ButtonPress-1>", lambda event: self._generic_start_draw(event, self.draw_light))
+                self.canvas.bind("<ButtonRelease-2>", lambda event: self.draw_line_finish(event, self.draw_light))
+
             self.canvas.config(cursor="pencil")
         elif value == 1:
             # Movement controls
-            for i in ["<ButtonRelease-1>", "<ButtonPress-1>", "<B1-Motion>"]:
+            for i in ["<ButtonRelease-1>", "<ButtonPress-1>", "<B1-Motion>", "<ButtonPress-2>", "<B2-Motion>",
+                      "<ButtonRelease-2>"]:
                 self.canvas.unbind(i)
             self.canvas.bind("<ButtonPress-1>", self.set_start)
             self.canvas.bind("<B1-Motion>", self.move)
@@ -2020,12 +2054,12 @@ class TilemapView(tk.Frame):
 
     def _generic_start_draw(self, event, draw_function):
         self.backup_state()
-        draw_function(event)
+        draw_function(event, False)
 
     def _generic_finish_draw(self, event, draw_function):
         self.canvas.delete("all")
         self.backup_state()
-        draw_function(event)
+        draw_function(event, True)
         self.redraw_view()
 
     def set_grid(self):
@@ -2051,16 +2085,23 @@ class TilemapView(tk.Frame):
         self.set_mode(self.master.master.tool_mode.get())
         self.redraw_view()
 
-    def event_to_tile(self, event):
+    def event_to_tile(self, event, scale: int = 64, return_type: type = int):
         """Converts mouse events to tiled coordinates"""
-        if self.master.master.border_mode.get():
-            tile_x = int(self.canvas.xview()[0] * self.level.level_width + event.x / 64)
-            tile_y = int(self.canvas.yview()[0] * self.level.level_height + event.y / 64)
+        if type(event) is tuple:
+            x = event[0]
+            y = event[1]
         else:
-            tile_x = int(self.canvas.xview()[0] * (self.level.level_width - 2) + event.x / 64)
-            tile_y = int(self.canvas.yview()[0] * (self.level.level_height - 2) + event.y / 64)
-            tile_x += 1
-            tile_y += 1
+            x = event.x
+            y = event.y
+
+        if self.master.master.border_mode.get():
+            tile_x = return_type(self.canvas.xview()[0] * self.level.level_width * 64 / scale + x / scale)
+            tile_y = return_type(self.canvas.yview()[0] * self.level.level_height * 64 / scale + y / scale)
+        else:
+            tile_x = return_type(self.canvas.xview()[0] * (self.level.level_width - 2) * 64 / scale + x / scale)
+            tile_y = return_type(self.canvas.yview()[0] * (self.level.level_height - 2) * 64 / scale + y / scale)
+            tile_x += return_type(64 / scale)
+            tile_y += return_type(64 / scale)
 
         return tile_x, tile_y
 
@@ -2077,18 +2118,66 @@ class TilemapView(tk.Frame):
             return False
         return True
 
-    def draw_tile(self, event):
-        """Event callback for drawing a tile on the grid"""
-        # Check to make sure tile is actually on the screen.  If not, cancel drawing.
+    def draw_line_start(self, event):
+        """Mark the starting position for drawing a line"""
         if not self.check_bounds(event):
             return
+        x, y = self.event_to_tile(event, scale=1, return_type=float)
+        self.line_start_x, self.line_start_y = x, y
+        self.canvas.create_rectangle((x - 8, y - 8, x + 8, y + 8),
+                                     fill="aqua", stipple="gray50", outline="black", outlinestipple="gray50", width=2)
+        self.canvas.update()
+
+    def draw_line_move(self, event):
+        """Draw a line connecting the starting position to the mouse"""
+        if not self.check_bounds(event):
+            return
+        x2, y2 = self.event_to_tile(event, scale=1, return_type=float)
+        self.canvas.delete('draw_line')
+        self.canvas.create_line(self.line_start_x, self.line_start_y, x2, y2,
+                                capstyle=tk.ROUND, fill="blue", stipple="gray50", tag="draw_line", width=10)
+
+    def draw_line_finish(self, event, function):
+        """Finish drawing the line"""
+        if not self.check_bounds(event):
+            self.redraw_view()
+            return
+
+        self.backup_state()
+
+        # Generate parametric functions x(t) and y(t)
+        end_x, end_y = self.event_to_tile(event, scale=1, return_type=float)
+        slope_x = (end_x - self.line_start_x) / 100
+        slope_y = (end_y - self.line_start_y) / 100
+
+        # Iterate through the parametric functions to draw the images
+        try_tile_x, try_tile_y = 0, 0
+        for t in range(101):
+            x = (slope_x * t + self.line_start_x) // 64
+            y = (slope_y * t + self.line_start_y) // 64
+            # Only draw the image if the coordinate has not been drawn to already
+            if not(try_tile_x == x and try_tile_y == y):
+                try_tile_x, try_tile_y = x, y
+                function((int(try_tile_x), int(try_tile_y)), limited=True)
+
+        self.redraw_view()
+        self.backup_state()
+
+    def draw_tile(self, event, limited=False):
+        """Event callback for drawing a tile on the grid"""
+        # Determine the position at which to to draw the tile
+        if type(event) is tuple:
+            # Coordinates were passed in directly
+            tile_x, tile_y = event
+        else:
+            # Check to make sure tile is actually on the screen.  If not, cancel drawing.
+            if not self.check_bounds(event):
+                return
+            tile_x, tile_y = self.event_to_tile(event)
 
         # No longer saved
         self.saved = False
         self.update_title()
-
-        # Determine the position at which to to draw the tile
-        tile_x, tile_y = self.event_to_tile(event)
 
         # Determine the id of the selected tile
         current_tile = self.master.master.visible_pane.selected_id.get()
@@ -2102,16 +2191,18 @@ class TilemapView(tk.Frame):
         except IndexError:
             pass
 
-    def draw_deco(self, event):
+    def draw_deco(self, event, limited=False):
         """Draw either a tile or a deco on the grid, depending on the arguments"""
-        if not self.check_bounds(event):
-            return
+        if type(event) is tuple:
+            tile_x, tile_y = event
+        else:
+            if not self.check_bounds(event):
+                return
+            tile_x, tile_y = self.event_to_tile(event)
 
         # No longer saved
         self.saved = False
         self.update_title()
-
-        tile_x, tile_y = self.event_to_tile(event)
 
         # Determine the id of the selected tile
         current_tile = self.master.master.visible_pane.selected_id.get()
@@ -2125,31 +2216,27 @@ class TilemapView(tk.Frame):
         else:
             self.level.decomap.add(tile_x, tile_y, int(current_tile))
 
-    def draw_collider(self, event):
+    def draw_collider(self, event, limited=False):
         """Event callback for drawing a collider on the grid"""
-
-        if self.master.master.border_mode.get():
-            tile_x = int(self.canvas.xview()[0] * (len(self.level.collider[0])) + event.x / 32)
-            tile_y = int(self.canvas.yview()[0] * (len(self.level.collider)) + event.y / 32)
+        if type(event) is tuple:
+            # Coordinates were passed in directly
+            tile_x, tile_y = event
         else:
-            tile_x = int(self.canvas.xview()[0] * (len(self.level.collider[0]) - 4) + event.x / 32)
-            tile_y = int(self.canvas.yview()[0] * (len(self.level.collider) - 4) + event.y / 32)
-            tile_x += 2
-            tile_y += 2
+            # Check to make sure tile is actually on the screen.  If not, cancel drawing.
+            # Top side catch
+            if event.y / 64 < 0.05:
+                return
+            # Bottom side catch
+            if event.y / 64 > 9.55:
+                return
+            # Left size catch
+            if event.x / 64 < 0.05:
+                return
+            # Right side catch
+            if event.x / 64 > 16.55:
+                return
 
-        # Check to make sure tile is actually on the screen.  If not, cancel drawing.
-        # Top side catch
-        if event.y / 64 < 0.05:
-            return
-        # Bottom side catch
-        if event.y / 64 > 9.55:
-            return
-        # Left size catch
-        if event.x / 64 < 0.05:
-            return
-        # Right side catch
-        if event.x / 64 > 16.55:
-            return
+            tile_x, tile_y = self.event_to_tile(event, scale=32)
 
         # Determine the id of the selected tile
         solid_state = self.master.master.visible_pane.selected_id.get()
@@ -2196,16 +2283,18 @@ class TilemapView(tk.Frame):
         except IndexError:
             pass
 
-    def draw_height(self, event):
+    def draw_height(self, event, limited=False):
         """Event callback for drawing heights"""
-        if not self.check_bounds(event):
-            return
+        if type(event) is tuple:
+            tile_x, tile_y = event
+        else:
+            if not self.check_bounds(event):
+                return
+            tile_x, tile_y = self.event_to_tile(event)
 
         # No longer saved
         self.saved = False
         self.update_title()
-
-        tile_x, tile_y = self.event_to_tile(event)
 
         # Determine the id of the selected tile
         height_option = self.master.master.visible_pane.selected_id.get()
@@ -2228,18 +2317,21 @@ class TilemapView(tk.Frame):
                 elif height_option == 3:
                     TilemapEditorWindow.ids_data["deco_ids"][i[0]]["height"] -= 5
 
-    def draw_zone(self, event):
+    def draw_zone(self, event, limited=False):
         """Event callback for editing loading zones"""
-        # Check to make sure tile is actually on the screen.  If not, cancel drawing.
-        if not self.check_bounds(event):
-            return
+        # Determine the position at which to to draw the tile
+        if type(event) is tuple:
+            # Coordinates were passed in directly
+            tile_x, tile_y = event
+        else:
+            # Check to make sure tile is actually on the screen.  If not, cancel drawing.
+            if not self.check_bounds(event):
+                return
+            tile_x, tile_y = self.event_to_tile(event)
 
         # No longer saved
         self.saved = False
         self.update_title()
-
-        # Determine the position at which to to draw the tile
-        tile_x, tile_y = self.event_to_tile(event)
 
         # Determine the id of the selected tile
         mode = self.master.master.visible_pane.selected_id.get()
@@ -2259,18 +2351,19 @@ class TilemapView(tk.Frame):
                 self.level.loading_zones[tile_x, tile_y] = LoadingZone("", [0, 0])
 
         elif mode == 2:
-            # Edit an existing zone
-            if (tile_x, tile_y) in self.level.loading_zones:
-                self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
-                                         image=TilemapEditorWindow.imgs["configure_zone"])
-                data = self.level.loading_zones[tile_x, tile_y]
-                new_data = DataSetDialog(self, [{"Target X": data.target_pos[0], "Target Y": data.target_pos[1]},
-                                                {"Target Level": data.target_level}]).result
-                if new_data is not None:
-                    self.level.loading_zones[tile_x, tile_y].target_pos = [int(new_data[0]["Target X"]),
-                                                                           int(new_data[0]["Target Y"])]
-                    self.level.loading_zones[tile_x, tile_y].target_level = new_data[1]["Target Level"]
-            self.redraw_view()
+            # Edit an existing zone, but only if in safe mode
+            if not limited:
+                if (tile_x, tile_y) in self.level.loading_zones:
+                    self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
+                                             image=TilemapEditorWindow.imgs["configure_zone"])
+                    data = self.level.loading_zones[tile_x, tile_y]
+                    new_data = DataSetDialog(self, [{"Target X": data.target_pos[0], "Target Y": data.target_pos[1]},
+                                                    {"Target Level": data.target_level}]).result
+                    if new_data is not None:
+                        self.level.loading_zones[tile_x, tile_y].target_pos = [int(new_data[0]["Target X"]),
+                                                                               int(new_data[0]["Target Y"])]
+                        self.level.loading_zones[tile_x, tile_y].target_level = new_data[1]["Target Level"]
+                self.redraw_view()
 
         elif mode == 3:
             # Copy the existing zone
@@ -2297,18 +2390,34 @@ class TilemapView(tk.Frame):
                 new_zone.target_pos[1] += tile_y - self.copied_zone_coords[1]
                 self.level.loading_zones[tile_x, tile_y] = new_zone
 
-    def draw_light(self, event):
+        elif mode == 6:
+            # Open the level referred to by the zone
+            # TODO: Fix bug where editor believes this changes the level data
+            if not limited:
+                self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
+                                         image=TilemapEditorWindow.imgs["goto_level"])
+                if (tile_x, tile_y) in self.level.loading_zones:
+                    destination = self.level.loading_zones[tile_x, tile_y].target_level
+                    if destination in App.project_data["levels"]:
+                        self.master.master.open_map(App.project_data["levels"][destination]["path"])
+                    else:
+                        messagebox.showerror("Level Not Found", "The target level was not found in project.json")
+
+    def draw_light(self, event, limited=False):
         """Event callback for drawing a light"""
-        # Check to make sure tile is actually on the screen.  If not, cancel drawing.
-        if not self.check_bounds(event):
-            return
+        # Determine the position at which to to draw the tile
+        if type(event) is tuple:
+            # Coordinates were passed in directly
+            tile_x, tile_y = event
+        else:
+            # Check to make sure tile is actually on the screen.  If not, cancel drawing.
+            if not self.check_bounds(event):
+                return
+            tile_x, tile_y = self.event_to_tile(event)
 
         # No longer saved
         self.saved = False
         self.update_title()
-
-        # Determine the position at which to to draw the tile
-        tile_x, tile_y = self.event_to_tile(event)
 
         # Determine the id of the selected tile
         mode = self.master.master.visible_pane.selected_id.get()
@@ -2331,14 +2440,15 @@ class TilemapView(tk.Frame):
                 self.level.lightmap[(tile_x, tile_y)] = Light(1, red, green, blue)
 
         elif mode == 2:
-            # Edit light
-            if (tile_x, tile_y) in self.level.lightmap:
-                self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
-                                         image=TilemapEditorWindow.imgs["edit_light"])
-                new_light = LightEditorDialog(self, self.level.lightmap[tile_x, tile_y]).result
-                if new_light is not None:
-                    new_light.active = True
-                    self.level.lightmap[tile_x, tile_y] = new_light
+            # Edit light, but only if in safe mode
+            if not limited:
+                if (tile_x, tile_y) in self.level.lightmap:
+                    self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
+                                             image=TilemapEditorWindow.imgs["edit_light"])
+                    new_light = LightEditorDialog(self, self.level.lightmap[tile_x, tile_y]).result
+                    if new_light is not None:
+                        new_light.active = True
+                        self.level.lightmap[tile_x, tile_y] = new_light
 
             self.redraw_view()
 

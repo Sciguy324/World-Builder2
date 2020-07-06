@@ -24,7 +24,7 @@ Core Feature Elaboration:
 			--Collision map
 			--Loading zone layer
 			--Lighting layer
-			-Switching between panels for individual tiles and tile assemblies
+			?-Switching between panels for individual tiles and tile assemblies
 			--Dropdown box for selecting tile group
 		
 		--Tile collections:
@@ -34,13 +34,13 @@ Core Feature Elaboration:
 				--New "TileGroup" class for panels
 			--Hard-coded group of "All" tiles
 		
-		-Tile assemblies:?
+		?-Tile assemblies:
 			-These are multi-tile objects that allow one to place structures quickly—like trees, for example
 			-Allows you to configure the height-value of decos
 			-The will have their own panel and collections
 			-Hard-coded group of "All" tile groups
 
-		-Patterns:
+		?-Patterns:
 			-These are templates that place multiple of the same tile in a defined pattern
 			-For example: A template for placing an arbitrary tile in a 3x3 shape rather than a 1x1
 
@@ -59,10 +59,9 @@ Core Feature Elaboration:
 			--Undo/redo buttons w/ keyboard shortcuts
 			--Separate row/column and x/y coordinate indicator
 			--Tool to change tilemap size
-			-"Draw-line" tool triggered by holding "shift"
-				-Releasing "shift" cancels, and blocks further drawing until mouse button is released
+			-"Draw-line" tool triggered by drawing with the middle mouse button
 				-Line indicator visible while in use
-			-Tool that opens the level that a loading zone is referring to
+			--Tool that opens the level that a loading zone is referring to
 		
 	-World-view window:
 		--A map of the various levels
