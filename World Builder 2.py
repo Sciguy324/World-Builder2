@@ -706,7 +706,6 @@ class GroupEditorGroup(tk.Frame):
 
 
 # TODO: Refactor ids list
-# TODO: Convert layers into their own classes
 
 class CustomButton(ttk.Button):
     """A ttk button that has special effects"""
@@ -870,14 +869,6 @@ class CustomNotebook(ttk.Notebook):
 
 class TilemapEditorWindow(tk.Frame):
     imgs = {}
-    # tile_dict = {}
-    # deco_dict = {}
-    # mini_tile_dict = {}
-    # mini_deco_dict = {}
-    # collider_dict = {}
-    # height_dict = {}
-    # loading_dict = {}
-    # light_dict = {}
     ids_data = {}
     __initialized = False
 
@@ -923,16 +914,6 @@ class TilemapEditorWindow(tk.Frame):
 
         # Create a lookup list of the available views
         self.view_list = []
-
-        # Create the master lookup dictionary of the available panes, and add the subcategories
-        # self.panes = {"tile": {},
-        #               "deco": {},
-        #               "collision": {},
-        #               "height": {},
-        #               "loading": {},
-        #               "light": {}}
-        #
-        # self.visible_pane = None
 
         # Add editor to parent window
         parent.add(self, text="Map Editor")
@@ -983,16 +964,16 @@ class TilemapEditorWindow(tk.Frame):
         self.button_spacing1.grid(row=0, column=5, sticky=tk.NW)
 
         # Create a lookup list of the different layers
-        self.layers = [TilemapLayer(), DecomapLayer(), CollisionLayer(), HeightLayer(), LoadingZoneLayer(),
-                       LightLayer()]
-        self.layer_id_lookup = dict((i, j) for i, j in zip(('tile', 'deco', 'collision', 'height', 'loading_zone',
-                                                            'light'), range(6)))
+        self.layers = [TilemapLayer('<Key-5>'), DecomapLayer('<Key-6>'), CollisionLayer('<Key-7>'),
+                       HeightLayer('<Key-8>'), LoadingZoneLayer('<Key-9>'), LightLayer('<Key-0>')]
+
+        self.layer_id_lookup = dict((j, i) for i, j in enumerate(('tile', 'deco', 'collision', 'height', 'loading_zone',
+                                                                  'light')))
 
         # Add layer selection buttons (tile, deco, collision, height, loading, light)
-        for i, j in enumerate(["tile_layer", "deco_layer", "collider_layer", "height_layer", "loading_layer",
-                               "light_layer"]):
+        for i, j in enumerate(self.layers):
             self.layer_button = tk.Radiobutton(self.buttons_bar, indicator=0, value=i, variable=self.layer,
-                                               image=TilemapEditorWindow.imgs[j])
+                                               image=j.icon)
             self.layer_button.grid(row=0, column=i + 6, sticky=tk.NW)
 
         # Add another spacing
@@ -1018,9 +999,8 @@ class TilemapEditorWindow(tk.Frame):
                             "<Key-4>": self.keybind_border_mode}
 
         # Set up the layer keybindings
-        for i in range(5, 10):
-            self.keybindings[f'<Key-{i}>'] = self.keybind_layer_mode
-        self.keybindings["<Key-0>"] = self.keybind_layer_mode
+        for i, j in enumerate(self.layers):
+            self.keybindings[j.keybinding] = lambda event: self.layer.set(i)
 
         # Set up menubar keybindings
         self.keybindings["<Control-o>"] = self._open_map
@@ -1044,10 +1024,10 @@ class TilemapEditorWindow(tk.Frame):
         self.selection_frame = ttk.Frame(self)
         self.selection_frame.grid(row=1, column=2, sticky=tk.E, ipadx=20)
         self.load_groups()
-        self.set_pane("All", self.layer.get())
+        #self.set_pane("All", self.layer.get())
+        self.group.set("All")
 
         # Add the category dropdown box
-        #options = list([i for i, j in self.panes["tile"].items()])
         options = self.layers[0].pane_options
         self.group_dropdown = tk.OptionMenu(self, self.group, *options)
         self.group_dropdown.grid(row=0, column=2, sticky=tk.E)
@@ -1273,22 +1253,11 @@ class TilemapEditorWindow(tk.Frame):
             new_id = self.layers[self.layer_id_lookup[mode]].add_to_pane(img, 'All')
 
             # Ensure the project.json record is up to date
-            if mode == 'tile':
-                TilemapEditorWindow.ids_data[f'{mode}_ids'].append({"id": new_id,
-                                                                    "tex": tile_name,
-                                                                    "geo": [0, 0, 0, 0]})
-            else:
-                TilemapEditorWindow.ids_data[f'{mode}_ids'].append({"id": new_id,
-                                                                    "tex": tile_name,
-                                                                    "height": 1,
-                                                                    "geo": [0, 0, 0, 0]})
-
-            # Update the image registries
-            # next_id = max(TilemapEditorWindow.tile_dict.keys()) + 1
-            # TilemapEditorWindow.tile_dict[next_id] = ImageTk.PhotoImage(img)
-            # TilemapEditorWindow.ids_data[f'{mode}_ids'].append({"id": next_id, "tex": tile_name, "geo": [0, 0, 0, 0]})
-            # Update the default pane
-            # self.layers[self.layer_id_lookup[mode]].panes['All'].add_option(next_id, mode)
+            TilemapEditorWindow.ids_data[f'{mode}_ids'].append({"id": new_id,
+                                                                "tex": tile_name,
+                                                                "geo": [0, 0, 0, 0]})
+            if mode == 'deco':
+                TilemapEditorWindow.ids_data['deco_ids'][-1]["height"] = 1
 
             print(f'Imported {tile_name} from {file_path}')
 
@@ -1377,60 +1346,19 @@ class TilemapEditorWindow(tk.Frame):
         else:
             self.border_mode.set(0)
 
-    def keybind_layer_mode(self, event):
-        """Generic callback for setting the layer"""
-        try:
-            if int(event.char) == 0:
-                self.layer.set(5)
-            else:
-                self.layer.set(int(event.char) - 5)
-        except ValueError:
-            print("Caught ValueError in keybind_layer_mode")
-
     @property
     def visible_pane(self):
         """Get the currently visible pane"""
         return self.layers[self.layer.get()].panes[self.group.get()]
 
     def set_pane(self, pane, layer):
-        """Set the currently viewable pane"""
+        """Set the currently viewable pane.  Do not use this outside of self.group's traceback."""
         # Remove current panes
-        # for i, j in self.panes.items():
-        #     for k, l in j.items():
-        #         l.pack_forget()
         for i in self.layers:
             i.hide_panes()
 
-        # FIXME: This line causes this function to be executed twice
-        self.group.set(pane)
-
         # Show the requested pane
         self.layers[layer].show_pane(pane)
-
-        # # Tilemap mode: select pane from the tile panes
-        # if layer == 0:
-        #     self.panes["tile"][pane].pack(anchor="ne")
-        #     # self.visible_pane = self.panes["tile"][pane]
-        # # Decomap mode: select pane from the deco panes
-        # elif layer == 1:
-        #     self.panes["deco"][pane].pack(anchor="ne")
-        #     # self.visible_pane = self.panes["deco"][pane]
-        # # Collision mode: select the collision pane
-        # elif layer == 2:
-        #     self.panes["collision"][pane].pack(anchor="ne")
-        #     # self.visible_pane = self.panes["collision"][pane]
-        # # Height mode: select the height pane
-        # elif layer == 3:
-        #     self.panes["height"][pane].pack(anchor="ne")
-        #     # self.visible_pane = self.panes["height"][pane]
-        # # Loading zone mode: select the loading zone pane
-        # elif layer == 4:
-        #     self.panes["loading"][pane].pack(anchor="ne")
-        #     # self.visible_pane = self.panes["loading"][pane]
-        # # Lightmap mode: select the lightmap pane
-        # elif layer == 5:
-        #     self.panes["light"][pane].pack(anchor="ne")
-        #     # self.visible_pane = self.panes["light"][pane]
 
     def set_layer(self, layer):
         """Set the currently editable layer"""
@@ -1442,16 +1370,7 @@ class TilemapEditorWindow(tk.Frame):
             self.set_option_menu(options)
             self.group_dropdown.grid(row=0, column=2, sticky=tk.E)
 
-        # if layer == 0:
-        #     options = list([i for i, j in self.panes["tile"].items()])
-        #     self.set_option_menu(options)
-        #     self.group_dropdown.grid(row=0, column=2, sticky=tk.E)
-        # elif layer == 1:
-        #     options = list([i for i, j in self.panes["deco"].items()])
-        #     self.set_option_menu(options)
-        #     self.group_dropdown.grid(row=0, column=2, sticky=tk.E)
-
-        self.set_pane("All", layer)
+        self.group.set("All")
         for i in self.view_list:
             i.set_layer()
 
@@ -1461,7 +1380,6 @@ class TilemapEditorWindow(tk.Frame):
             raise ValueError(f'\'{layer_name}\' is not a valid pane type!')
 
         # Instruct the layer in question to add a pane
-        print("[DEBUG]:", self.layers[self.layer_id_lookup[layer_name]])
         self.layers[self.layer_id_lookup[layer_name]].add_pane(pane_name, pane_entries, self.selection_frame)
 
     def set_option_menu(self, options):
@@ -1475,42 +1393,6 @@ class TilemapEditorWindow(tk.Frame):
         # Add the hard-coded "all" category
         for layer in self.layers:
             layer.load_default_group(self.selection_frame)
-
-        # self.panes["tile"] = {"All": TileCollection(self.selection_frame,
-        #                                             [i for i, j in TilemapEditorWindow.tile_dict.items()],
-        #                                             "tile",
-        #                                             borderwidth=1,
-        #                                             relief=tk.SUNKEN)}
-        #
-        # self.panes["deco"] = {"All": TileCollection(self.selection_frame,
-        #                                             [i for i, j in TilemapEditorWindow.deco_dict.items()],
-        #                                             "deco",
-        #                                             borderwidth=1,
-        #                                             relief=tk.SUNKEN)}
-        #
-        # self.panes["collision"] = {"All": TileCollection(self.selection_frame,
-        #                                                  [0, 1],
-        #                                                  "collision",
-        #                                                  borderwidth=1,
-        #                                                  relief=tk.SUNKEN)}
-        #
-        # self.panes["height"] = {"All": TileCollection(self.selection_frame,
-        #                                               [0, 1, 2, 3],
-        #                                               "height",
-        #                                               borderwidth=1,
-        #                                               relief=tk.SUNKEN)}
-        #
-        # self.panes["loading"] = {"All": TileCollection(self.selection_frame,
-        #                                                [0, 1, 2, 3, 4, 5, 6],
-        #                                                "loading",
-        #                                                borderwidth=1,
-        #                                                relief=tk.SUNKEN)}
-        #
-        # self.panes["light"] = {"All": TileCollection(self.selection_frame,
-        #                                              [0, 1, 2, 3, 4],
-        #                                              "light",
-        #                                              borderwidth=1,
-        #                                              relief=tk.SUNKEN)}
 
         print("Loaded: ")
         self.load_custom_panes(App.project_data["groups"])
@@ -1528,17 +1410,6 @@ class TilemapEditorWindow(tk.Frame):
         # Unload tile panes
         for i in (0, 1):
             self.layers[i].unload_panes()
-
-        # for name, pane in self.panes["tile"].copy().items():
-        #     if name != "All":
-        #         pane.forget()
-        #         del self.panes["tile"][name]
-        #
-        # # Unload deco panes
-        # for name, pane in self.panes["deco"].copy().items():
-        #     if name != "All":
-        #         pane.forget()
-        #         del self.panes["deco"][name]
 
         # Load tile panes
         self.load_custom_panes(App.project_data["groups"])
@@ -1574,39 +1445,6 @@ class TilemapEditorWindow(tk.Frame):
         border_mode_data = '''R0lGODlhIAAgAIABAAAAAP///yH5BAEKAAEALAAAAAAgACAAAA
             JChI+py+0Po5y0woCz3jy4DnZf\nSGJjGZ6o2Kxp67JMLC80p94erJt8n7sFacNY0XVc
             JVHLUpP0fM16Pov1is1qt5QCADs=
-            '''
-
-        tile_layer_data = '''R0lGODlhIAAgAKECAAAAAD8/P////////yH5BAEKAAIALAAAAAA
-            gACAAAAJNlI+py+0Po5y0woCz\n3jy4DnZfAJTmiaJjyrJrC5dv3M50at9nrssN1sP9S
-            MHdsGhkAJE+JZHJ60V101uVdo1lYdvakQmw\niMfksvlsKQAAOw==
-            '''
-
-        deco_layer_data = '''R0lGODlhIAAgAIABAAAAAP///yH5BAEKAAEALAAAAAAgACAAAAJ
-            PjI8JkO1/FoMUyllzlLrf1WUf\nFjojWJpn2pwca7gXvH20st5xfssk6+v5fp4hqmQ8A
-            nk0mS4QbEZhRmpyWUUmlZXtTDNsCbnP77NG\n1JkrBQA7
-            '''
-
-        collision_layer_data = '''R0lGODlhIAAgAKECAAAAAGhoaP///////yH5BAEKAAMALA
-            AAAAAgACAAAAJrnI+py20AnGQQzvuq\nxVJv3ngRSIkjmZgnmqnsoX5svJLCLWi48O4+
-            3vv5WEIhqlKskEw3E4gmekI1nGn0YvVgstQJV9v5\nKh1i8KJ8TQXQlbV6zQYE3I+5HZ
-            69zyNyvV7l99cXSFh4xxfnUgAAOw==
-            '''
-
-        height_layer_data = '''R0lGODlhIAAgAIABAAAAAP///yH5BAEKAAEALAAAAAAgACAAA
-            AJRjI+pq+APo5xo2gsr3lLzDzCi\nI5ZlZqZHp5pWO15ws80Masdkrof8/fgBd8IErrg
-            KIj2+peG4hPI4QgzyFY04n8ptgNgCgZhiWbJs\nPaOx3kQBADs=
-            '''
-
-        loading_layer_data = '''R0lGODlhIAAgAIABAAAAAP///yH5BAEKAAEALAAAAAAgACAA
-            AAJrBBKGmtfrmIwU2ocZ2rz7v2ng\nSBoTiXZnynJi64kv7JoXDa44Ou+ys6vpPqaisX
-            YjGpc5IG7YS9kaw9Y0VKFdldrXb1lUzcJU8HcU\nRaeDW/FzTZausVZnUGmu8vKTOdt+
-            x5WRtVJIeHgxUQAAOw==
-            '''
-
-        light_layer_data = '''R0lGODlhIAAgAKEAAAAAAM7Ozv///wAAACH5BAEKAAMALAAAAA
-            AgACAAAAJznI+py+0PBwCxnmkd\nvdv0LHWY94HlBabRiEzuyTIu97JzNgn6LpxWzuP5
-            VoBeMTh8AI/BHhEDbO4oL6JUmIpekxpmkysj\nScGKm3bKgZS8ujU5cX6rsaryMVb3BC
-            b7PBwQsCenJtjnxxGI51d1+Nf4CIlQAAA7
             '''
 
         solidify_data = '''R0lGODlhEAAQAMIFAACJAACNAADNAAD9AAD/AP///////////yH5B
@@ -1690,12 +1528,6 @@ class TilemapEditorWindow(tk.Frame):
                     "move": tk.PhotoImage("img_move_tool", data=move_tool_data),
                     "grid": tk.PhotoImage("img_grid_mode", data=grid_mode_data),
                     "border": tk.PhotoImage("img_border_mode", data=border_mode_data),
-                    "tile_layer": tk.PhotoImage("img_tile_layer", data=tile_layer_data),
-                    "deco_layer": tk.PhotoImage("img_deco_layer", data=deco_layer_data),
-                    "collider_layer": tk.PhotoImage("img_collide_layer", data=collision_layer_data),
-                    "height_layer": tk.PhotoImage("img_height_layer", data=height_layer_data),
-                    "loading_layer": tk.PhotoImage("img_load_layer", data=loading_layer_data),
-                    "light_layer": tk.PhotoImage("img_light_layer", data=light_layer_data),
                     "delete": tk.PhotoImage("img_delete", data=delete_zone).zoom(64).subsample(16),
                     "solidify": tk.PhotoImage("img_solidify", data=solidify_data).zoom(64).subsample(16),
                     "desolidify": tk.PhotoImage("img_desolidify", data=desolidify_data).zoom(64).subsample(16),
@@ -1776,15 +1608,16 @@ class TilemapEditorWindow(tk.Frame):
 
 
 class TilemapEditingLayer:
-
     img_dict = {}
+    icon = None
     __initialized = False
 
-    def __init__(self):
+    def __init__(self, keybinding=None):
         # Ensure layer is initialized
         if not type(self).__initialized:
             type(self)._initialize()
         self.panes = {}
+        self.keybinding = keybinding
         self.render = False
 
     def enable(self, view):
@@ -1843,7 +1676,8 @@ class TilemapEditingLayer:
 
     def load_default_group(self, selection_frame):
         """Load the default 'All' layer"""
-        self.panes['All'] = TileCollection(selection_frame, [i for i, j in self.img_dict.items()], self, borderwidth=1, relief=tk.SUNKEN)
+        self.panes['All'] = TileCollection(selection_frame, [i for i, j in self.img_dict.items()], self,
+                                           borderwidth=1, relief=tk.SUNKEN)
 
     @classmethod
     def _initialize(cls):
@@ -1853,6 +1687,7 @@ class TilemapEditingLayer:
 
 class TilemapLayer(TilemapEditingLayer):
     img_dict = {}
+    icon = None
     mini_img_dict = {}
 
     def draw_full(self, view, update_minimap=False):
@@ -1886,9 +1721,17 @@ class TilemapLayer(TilemapEditingLayer):
         """Provide a list of the available group (pane) names"""
         return list([i for i, j in self.panes.items()])
 
+    @classmethod
+    def _initialize(cls):
+        cls.icon = tk.PhotoImage("img_tile_layer", data='''R0lGODlhIAAgAKECAAAAAD8/P////////yH5BAEKAAIALAAAAAAgACAAAAJ
+                                                           NlI+py+0Po5y0woCz\n3jy4DnZfAJTmiaJjyrJrC5dv3M50at9nrssN1sP9
+                                                           SMHdsGhkAJE+JZHJ60V101uVdo1lYdvakQmw\niMfksvlsKQAAOw==
+                                                           ''')
+
 
 class DecomapLayer(TilemapEditingLayer):
     img_dict = {}
+    icon = None
     mini_img_dict = {}
 
     def draw_full(self, view, update_minimap=False):
@@ -1921,9 +1764,17 @@ class DecomapLayer(TilemapEditingLayer):
         """Provide a list of the available group (pane) names"""
         return list([i for i, j in self.panes.items()])
 
+    @classmethod
+    def _initialize(cls):
+        cls.icon = tk.PhotoImage("img_deco_layer", data='''R0lGODlhIAAgAIABAAAAAP///yH5BAEKAAEALAAAAAAgACAAAAJPjI8JkO1
+                                                           /FoMUyllzlLrf1WUf\nFjojWJpn2pwca7gXvH20st5xfssk6+v5fp4hqmQ8
+                                                           Ank0mS4QbEZhRmpyWUUmlZXtTDNsCbnP77NG\n1JkrBQA7
+                                                           ''')
+
 
 class CollisionLayer(TilemapEditingLayer):
     img_dict = {}
+    icon = None
 
     def enable(self, view):
         view.canvas.bind("<B1-Motion>", lambda event: view.generic_draw(event, self.draw_individual,
@@ -2014,9 +1865,18 @@ class CollisionLayer(TilemapEditingLayer):
         except IndexError:
             pass
 
+    @classmethod
+    def _initialize(cls):
+        cls.icon = tk.PhotoImage("img_collision_layer", data='''R0lGODlhIAAgAKECAAAAAGhoaP///////yH5BAEKAAMALAAAAAAgAC
+                                                                AAAAJrnI+py20AnGQQzvuq\nxVJv3ngRSIkjmZgnmqnsoX5svJLCLW
+                                                                i48O4+3vv5WEIhqlKskEw3E4gmekI1nGn0YvVgstQJV9v5\nKh1i8K
+                                                                J8TQXQlbV6zQYE3I+5HZ69zyNyvV7l99cXSFh4xxfnUgAAOw==
+                                                                ''')
+
 
 class HeightLayer(TilemapEditingLayer):
     img_dict = {}
+    icon = None
 
     def enable(self, view):
         view.canvas.bind("<ButtonRelease-1>", lambda event: view.redraw_view())
@@ -2059,14 +1919,22 @@ class HeightLayer(TilemapEditingLayer):
                 elif height_option == 3:
                     TilemapEditorWindow.ids_data["deco_ids"][i[0]]["height"] -= 5
 
+    @classmethod
+    def _initialize(cls):
+        cls.icon = tk.PhotoImage("img_height_layer", data='''R0lGODlhIAAgAIABAAAAAP///yH5BAEKAAEALAAAAAAgACAAAAJRjI+pq
+                                                             +APo5xo2gsr3lLzDzCi\nI5ZlZqZHp5pWO15ws80Masdkrof8/fgBd8IE
+                                                             rrgKIj2+peG4hPI4QgzyFY04n8ptgNgCgZhiWbJs\nPaOx3kQBADs=
+                                                             ''')
+
 
 class LoadingZoneLayer(TilemapEditingLayer):
     img_dict = {}
     special_imgs = {}
+    icon = None
 
     def enable(self, view):
         view.canvas.bind("<B1-Motion>", lambda event: view.generic_draw(event, self.draw_individual, True))
-        view.canvas.bind("<ButtonRelease-1>", lambda event: view.generic_finish_draw(event, self.draw_individual))
+        view.canvas.bind("<ButtonRelease-1>", lambda event: view.generic_finish_draw(event, self.draw_individual, True))
         view.canvas.bind("<ButtonPress-1>", lambda event: view.generic_start_draw(event, self.draw_individual))
         view.canvas.bind("<ButtonRelease-2>", lambda event: view.draw_line_finish(event, self.draw_individual))
 
@@ -2140,7 +2008,8 @@ class LoadingZoneLayer(TilemapEditingLayer):
 
         elif mode == 6:
             # Open the level referred to by the zone
-            # TODO: Fix bug where editor believes this changes the level data
+            view.saved = True
+            view.update_title()
             if not limited:
                 view.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
                                          image=TilemapEditorWindow.imgs["goto_level"])
@@ -2166,10 +2035,17 @@ class LoadingZoneLayer(TilemapEditingLayer):
         cls.special_imgs = {"active_zone": active_zone,
                             "inactive_zone": inactive_zone}
 
+        cls.icon = tk.PhotoImage("img_loading_layer", data='''R0lGODlhIAAgAIABAAAAAP///yH5BAEKAAEALAAAAAAgACAAAAJrBBKG
+                                                              mtfrmIwU2ocZ2rz7v2ng\nSBoTiXZnynJi64kv7JoXDa44Ou+ys6vpPq
+                                                              aisXYjGpc5IG7YS9kaw9Y0VKFdldrXb1lUzcJU8HcU\nRaeDW/FzTZau
+                                                              sVZnUGmu8vKTOdt+x5WRtVJIeHgxUQAAOw==
+                                                              ''')
+
 
 class LightLayer(TilemapEditingLayer):
     img_dict = {}
     special_imgs = {}
+    icon = None
 
     def draw_full(self, view):
         """Draw the light map to the view"""
@@ -2245,6 +2121,12 @@ class LightLayer(TilemapEditingLayer):
 
         cls.special_imgs = {"active_light": active_light,
                             "inactive_light": inactive_light}
+
+        cls.icon = tk.PhotoImage("img_light_layer", data='''R0lGODlhIAAgAKEAAAAAAM7Ozv///wAAACH5BAEKAAMALAAAAAAgACAAAA
+                                                            JznI+py+0PBwCxnmkd\nvdv0LHWY94HlBabRiEzuyTIu97JzNgn6LpxWzu
+                                                            P5VoBeMTh8AI/BHhEDbO4oL6JUmIpekxpmkysj\nScGKm3bKgZS8ujU5cX
+                                                            6rsaryMVb3BCb7PBwQsCenJtjnxxGI51d1+Nf4CIlQAAA7
+                                                            ''')
 
 
 class TilemapView(tk.Frame):
@@ -2322,13 +2204,9 @@ class TilemapView(tk.Frame):
 
     def update_coords(self, event):
         """Event callback for updating the tilemap editor's coordinates"""
-        disp_x = (self.canvas.xview()[0] * self.level.level_width - int(self.master.master.border_mode.get()) + 1) * 64
-        disp_y = (self.canvas.yview()[0] * self.level.level_height - int(self.master.master.border_mode.get()) + 1) * 64
-        x = event.x + disp_x
-        y = event.y + disp_y
-        # FIXME: X and Y coordinates are calculated incorrectly
-        self.master.master.tile_coords_text.set("Col, Row: {:.0f}, {:.0f}".format(x // 64, y // 64))
-        self.master.master.level_coords_text.set("X, Y: {:.0f}, {:.0f}".format(event.x, event.y))
+        x, y = self.event_to_tile(event, scale=1)
+        self.master.master.tile_coords_text.set("Tile X, Tile Y: {:.0f}, {:.0f}".format(x // 64, y // 64))
+        self.master.master.level_coords_text.set("X, Y: {:.0f}, {:.0f}".format(x, y))
 
     def close(self):
         """Tells the view to close"""
@@ -2467,7 +2345,6 @@ class TilemapView(tk.Frame):
 
     def event_to_tile(self, event, scale: int = 64, return_type: type = int):
         """Converts mouse events to tiled coordinates"""
-        # TODO: Check if self.canvas.canvasx/y would work better here
         if type(event) is tuple:
             x = event[0]
             y = event[1]
@@ -2610,7 +2487,7 @@ class TilemapView(tk.Frame):
             ids_data = re.sub(r'\[\s+(\d),\s+(\d),\s+(\d),\s+(\d)\s+\]', r'[\1, \2, \3, \4]', ids_data)
             f.write(ids_data)
         # If this file is NOT part of the project and hasn't been excluded, ask whether it should be.
-        print(self.level.ignore_from_project)
+        print("Ignore level from project:", self.level.ignore_from_project)
         if not self.level.ignore_from_project:
             if self.level.name not in App.project_data["levels"]:
                 result = messagebox.askyesnocancel(title="Unregistered Level", message="This level was not found in "
@@ -3196,15 +3073,6 @@ class TilePane(SelectionPane):
             self.current_y += 1
             self.current_x = 0
 
-        # If mode = "tile" load from tileset.  If mode = "deco" load from decoset
-        # if mode == "tile":
-        #     image = TilemapEditorWindow.tile_dict[value]
-        # elif mode == "deco":
-        #     image = TilemapEditorWindow.deco_dict[value]
-        # else:
-        #     raise ValueError("Cannot initialize TileCollection with unknown mode '{}'."
-        #                      "  Options are 'tile' and 'deco'".format(mode))
-
         radiobutton = tk.Radiobutton(self.canvas,
                                      indicator=0,
                                      value=value,
@@ -3226,23 +3094,6 @@ class TileCollection(TilePane):
         super().__init__(parent, **kw)
         # Save a reference to the tracker variable
         self.selected_id = tk.IntVar(self, 0)
-
-        # If mode = "tile" load from tileset, if mode = "deco" load from decoset, etc.
-        # if mode == "tile":
-        #     image_dict = TilemapEditorWindow.tile_dict
-        # elif mode == "deco":
-        #     image_dict = TilemapEditorWindow.deco_dict
-        # elif mode == "collision":
-        #     image_dict = TilemapEditorWindow.collider_dict
-        # elif mode == "height":
-        #     image_dict = TilemapEditorWindow.height_dict
-        # elif mode == "loading":
-        #     image_dict = TilemapEditorWindow.loading_dict
-        # elif mode == "light":
-        #     image_dict = TilemapEditorWindow.light_dict
-        # else:
-        #     raise ValueError("Cannot initialize TileCollection with unknown mode '{}'."
-        #                      "  Options are 'tile,' 'deco,' 'collision,' 'height,' 'loading' and 'light'".format(mode))
 
         # TODO: Add a configuration option for changing the width of the pane
         # Iterate through group to declare tile images in a HEIGHT x 3 grid
