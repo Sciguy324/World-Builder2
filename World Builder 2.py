@@ -1734,6 +1734,37 @@ class TilemapEditorWindow(tk.Frame):
         cls.__initialized = True
 
 
+class TilemapEditorLayer:
+
+    def __init__(self, parent):
+        self.panes = {}
+        self.visible = False
+
+    def enable_visibility(self, control_widget):
+        self.visible = True
+
+    def disable_visibility(self):
+        self.visible = False
+
+    def draw_full(self):
+        """Override in subclass"""
+        pass
+
+    def draw_individual(self):
+        """Override in subclass"""
+        pass
+
+    def add_pane(self, pane_name, pane_data):
+        """Override in subclass"""
+        pass
+
+
+class TilemapLayer(TilemapEditorLayer):
+
+    def enable_visibility(self, control_widget):
+        control_widget.bind("<B1-Motion>", self.draw_individual)
+
+
 class TilemapView(tk.Frame):
     __initialized = False
     imgs = {}
@@ -1976,10 +2007,6 @@ class TilemapView(tk.Frame):
         # Redraw the border if enabled (self.master.master.border_mode.get()=1)
         if self.master.master.border_mode.get():
             self.draw_border()
-
-    def set_id(self, tile_id):
-        """Event callback to update the current tile ID"""
-        self.current_tile = tile_id
 
     def update_title(self):
         """Update the title of the view"""
