@@ -1742,6 +1742,7 @@ class TilemapEditingLayer:
 
     def __init__(self):
         self.panes = {}
+        self.render = False
 
     def enable(self, view):
         """Set up bindings and enable the layer."""
@@ -1755,7 +1756,7 @@ class TilemapEditingLayer:
         """Disable the layer.  Override in subclass"""
         pass
 
-    def draw_full(self, level_data):
+    def draw_full(self, view):
         """Draw the entire map.  Override in subclass"""
         pass
 
@@ -1787,7 +1788,21 @@ class MapLayer(TilemapEditingLayer):
 
 class TilemapLayer(MapLayer):
 
+    def draw_full(self, view, update_minimap=False):
+        """Draw the tilemap to the view"""
+        for i, j in enumerate(view.level.tilemap):
+            for k, m in enumerate(j):
+                if m != 0:
+                    view.canvas.create_image((k * 64 + 32, i * 64 + 32), image=TilemapEditorWindow.tile_dict[m])
+                    if update_minimap:
+                        if TilemapEditorWindow.mini_tile_dict[m].mode == 'RGBA':
+                            view.image_view.paste(TilemapEditorWindow.mini_tile_dict[m], box=(k * 8, i * 8),
+                                                  mask=TilemapEditorWindow.mini_tile_dict[m])
+                        else:
+                            view.image_view.paste(TilemapEditorWindow.mini_tile_dict[m], box=(k * 8, i * 8))
+
     def draw_individual(self, view, tile_x, tile_y, limited=False):
+        """Draw and add an individual tile to the tilemap"""
         current_tile = view.master.master.visible_pane.selected_id.get()
 
         # Draw the tile
@@ -1801,6 +1816,19 @@ class TilemapLayer(MapLayer):
 
 
 class DecomapLayer(MapLayer):
+
+    def draw_full(self, view, update_minimap=False):
+        """Draw the current level's decomap"""
+        view.level.decomap.sort()
+        for deco_id, x, y in view.level.decomap:
+            if deco_id != 0:
+                view.canvas.create_image((x * 64 + 32, y * 64 + 32), image=TilemapEditorWindow.deco_dict[deco_id])
+                if update_minimap:
+                    if TilemapEditorWindow.mini_deco_dict[deco_id].mode == 'RGBA':
+                        view.image_view.paste(TilemapEditorWindow.mini_deco_dict[deco_id], box=(x * 8, y * 8),
+                                              mask=TilemapEditorWindow.mini_deco_dict[deco_id])
+                    else:
+                        view.image_view.paste(TilemapEditorWindow.mini_deco_dict[deco_id], box=(x * 8, y * 8))
 
     def draw_individual(self, view, tile_x, tile_y, limited=False):
         current_tile = view.master.master.visible_pane.selected_id.get()
@@ -1829,6 +1857,35 @@ class CollisionLayer(TilemapEditingLayer):
                                                                                   update_save=False))
         view.canvas.unbind("<ButtonPress-2>")
         view.canvas.unbind("<B2-Motion>")
+
+    def draw_full(self, view):
+        """Draw the collision map to the view"""
+        view.apply_geometry()
+        for i in range(view.level.level_width * 2 + 1):
+            view.canvas.create_line(32 * i, 0, 32 * i, 64 * view.level.level_height, fill="BLACK", width=1.0)
+        for i in range(view.level.level_height * 2 + 1):
+            view.canvas.create_line(0, 32 * i, 64 * view.level.level_width, 32 * i, fill="BLACK", width=1.0)
+        for i, j in enumerate(view.level.collider):
+            solid_count = 0
+            last_k = 0
+            # When drawing rows, combine adjacent solids into a single rectangle
+            for k, m in enumerate(j):
+                if m == 1:
+                    solid_count += 1
+                elif m == 0 and solid_count > 0:
+                    view.canvas.create_rectangle((k * 32 - 32 * solid_count, i * 32, k * 32, i * 32 + 32),
+                                                 fill="gray",
+                                                 width=1,
+                                                 stipple="gray50")
+                    solid_count = 0
+                last_k = k
+
+            # End of row was solid, and never got a chance to fill in during loop.  Do so now.
+            if solid_count > 0:
+                view.canvas.create_rectangle(((last_k - solid_count) * 32 + 32, i * 32, last_k * 32 + 32, i * 32 + 32),
+                                             fill="gray",
+                                             width=1,
+                                             stipple="gray50")
 
     def draw_individual(self, view, tile_x, tile_y, limited=False):
         # Determine the id of the selected tile
@@ -1885,6 +1942,19 @@ class HeightLayer(TilemapEditingLayer):
                                                                                   update_save=False))
         view.canvas.bind("<ButtonRelease-2>", lambda event: view.draw_line_finish(event, self.draw_individual))
 
+    def draw_full(self, view):
+        """Draw the height map to the view"""
+        for deco_id, x, y in view.level.decomap:
+            if deco_id != 0:
+                # self.canvas.create_image((x * 64 + 32, y * 64 + 32), image=TilemapEditorWindow.imgs["height_blank"])
+                view.canvas.create_rectangle((x * 64, y * 64, x * 64 + 64, y * 64 + 64),
+                                             fill="orange",
+                                             outline="orange",
+                                             width=2,
+                                             stipple="gray50")
+                view.canvas.create_text((x * 64 + 32, y * 64 + 32), fill="Dark Red", font="Courier 30 bold",
+                                        text=str(TilemapEditorWindow.ids_data["deco_ids"][deco_id]["height"]))
+
     def draw_individual(self, view, tile_x, tile_y, limited=False):
         # Determine the id of the selected tile
         height_option = view.master.master.visible_pane.selected_id.get()
@@ -1915,6 +1985,16 @@ class LoadingZoneLayer(TilemapEditingLayer):
         view.canvas.bind("<ButtonRelease-1>", lambda event: view.generic_finish_draw(event, self.draw_individual))
         view.canvas.bind("<ButtonPress-1>", lambda event: view.generic_start_draw(event, self.draw_individual))
         view.canvas.bind("<ButtonRelease-2>", lambda event: view.draw_line_finish(event, self.draw_individual))
+
+    def draw_full(self, view):
+        """Draw the loading zones to the view"""
+        for i, j in view.level.loading_zones.items():
+            if j.target_level == "":
+                view.canvas.create_image((i[0] * 64 + 32, i[1] * 64 + 32),
+                                         image=TilemapView.imgs["inactive_zone"])
+            else:
+                view.canvas.create_image((i[0] * 64 + 32, i[1] * 64 + 32),
+                                         image=TilemapView.imgs["active_zone"])
 
     def draw_individual(self, view, tile_x, tile_y, limited=False):
         # Determine the id of the selected tile
@@ -1989,6 +2069,16 @@ class LoadingZoneLayer(TilemapEditingLayer):
 
 
 class LightLayer(TilemapEditingLayer):
+
+    def draw_full(self, view):
+        """Draw the light map to the view"""
+        for i, j in view.level.lightmap.items():
+            if j.active:
+                view.canvas.create_image((i[0] * 64 + 32, i[1] * 64 + 32),
+                                         image=TilemapView.imgs["active_light"])
+            else:
+                view.canvas.create_image((i[0] * 64 + 32, i[1] * 64 + 32),
+                                         image=TilemapView.imgs["inactive_light"])
 
     def draw_individual(self, view, tile_x, tile_y, limited=False):
         # Determine the id of the selected tile
@@ -2151,93 +2241,93 @@ class TilemapView(tk.Frame):
         for i in range(self.level.level_height + 1):
             self.canvas.create_line(0, 64 * i, 64 * self.level.level_width, 64 * i, fill="BLACK", width=2.0)
 
-    def draw_tilemap(self, update_minimap=False):
-        """Draw the current level"""
-        for i, j in enumerate(self.level.tilemap):
-            for k, m in enumerate(j):
-                if m != 0:
-                    self.canvas.create_image((k * 64 + 32, i * 64 + 32), image=TilemapEditorWindow.tile_dict[m])
-                    if update_minimap:
-                        if TilemapEditorWindow.mini_tile_dict[m].mode == 'RGBA':
-                            self.image_view.paste(TilemapEditorWindow.mini_tile_dict[m], box=(k * 8, i * 8),
-                                                  mask=TilemapEditorWindow.mini_tile_dict[m])
-                        else:
-                            self.image_view.paste(TilemapEditorWindow.mini_tile_dict[m], box=(k * 8, i * 8))
+    # def draw_tilemap(self, update_minimap=False):
+    #     """Draw the current level"""
+    #     for i, j in enumerate(self.level.tilemap):
+    #         for k, m in enumerate(j):
+    #             if m != 0:
+    #                 self.canvas.create_image((k * 64 + 32, i * 64 + 32), image=TilemapEditorWindow.tile_dict[m])
+    #                 if update_minimap:
+    #                     if TilemapEditorWindow.mini_tile_dict[m].mode == 'RGBA':
+    #                         self.image_view.paste(TilemapEditorWindow.mini_tile_dict[m], box=(k * 8, i * 8),
+    #                                               mask=TilemapEditorWindow.mini_tile_dict[m])
+    #                     else:
+    #                         self.image_view.paste(TilemapEditorWindow.mini_tile_dict[m], box=(k * 8, i * 8))
 
-    def draw_decomap(self, update_minimap=False):
-        """Draw the current level's decomap"""
-        self.level.decomap.sort()
-        for deco_id, x, y in self.level.decomap:
-            if deco_id != 0:
-                self.canvas.create_image((x * 64 + 32, y * 64 + 32), image=TilemapEditorWindow.deco_dict[deco_id])
-                if update_minimap:
-                    if TilemapEditorWindow.mini_deco_dict[deco_id].mode == 'RGBA':
-                        self.image_view.paste(TilemapEditorWindow.mini_deco_dict[deco_id], box=(x * 8, y * 8),
-                                              mask=TilemapEditorWindow.mini_deco_dict[deco_id])
-                    else:
-                        self.image_view.paste(TilemapEditorWindow.mini_deco_dict[deco_id], box=(x * 8, y * 8))
+    # def draw_decomap(self, update_minimap=False):
+    #     """Draw the current level's decomap"""
+    #     self.level.decomap.sort()
+    #     for deco_id, x, y in self.level.decomap:
+    #         if deco_id != 0:
+    #             self.canvas.create_image((x * 64 + 32, y * 64 + 32), image=TilemapEditorWindow.deco_dict[deco_id])
+    #             if update_minimap:
+    #                 if TilemapEditorWindow.mini_deco_dict[deco_id].mode == 'RGBA':
+    #                     self.image_view.paste(TilemapEditorWindow.mini_deco_dict[deco_id], box=(x * 8, y * 8),
+    #                                           mask=TilemapEditorWindow.mini_deco_dict[deco_id])
+    #                 else:
+    #                     self.image_view.paste(TilemapEditorWindow.mini_deco_dict[deco_id], box=(x * 8, y * 8))
 
-    def draw_collision(self):
-        """Draw the collision map"""
-        self.apply_geometry()
-        for i in range(self.level.level_width * 2 + 1):
-            self.canvas.create_line(32 * i, 0, 32 * i, 64 * self.level.level_height, fill="BLACK", width=1.0)
-        for i in range(self.level.level_height * 2 + 1):
-            self.canvas.create_line(0, 32 * i, 64 * self.level.level_width, 32 * i, fill="BLACK", width=1.0)
-        for i, j in enumerate(self.level.collider):
-            solid_count = 0
-            last_k = 0
-            # When drawing rows, combine adjacent solids into a single rectangle
-            for k, m in enumerate(j):
-                if m == 1:
-                    solid_count += 1
-                elif m == 0 and solid_count > 0:
-                    self.canvas.create_rectangle((k * 32 - 32 * solid_count, i * 32, k * 32, i * 32 + 32),
-                                                 fill="gray",
-                                                 width=1,
-                                                 stipple="gray50")
-                    solid_count = 0
-                last_k = k
+    # def draw_collision(self):
+    #     """Draw the collision map"""
+    #     self.apply_geometry()
+    #     for i in range(self.level.level_width * 2 + 1):
+    #         self.canvas.create_line(32 * i, 0, 32 * i, 64 * self.level.level_height, fill="BLACK", width=1.0)
+    #     for i in range(self.level.level_height * 2 + 1):
+    #         self.canvas.create_line(0, 32 * i, 64 * self.level.level_width, 32 * i, fill="BLACK", width=1.0)
+    #     for i, j in enumerate(self.level.collider):
+    #         solid_count = 0
+    #         last_k = 0
+    #         # When drawing rows, combine adjacent solids into a single rectangle
+    #         for k, m in enumerate(j):
+    #             if m == 1:
+    #                 solid_count += 1
+    #             elif m == 0 and solid_count > 0:
+    #                 self.canvas.create_rectangle((k * 32 - 32 * solid_count, i * 32, k * 32, i * 32 + 32),
+    #                                              fill="gray",
+    #                                              width=1,
+    #                                              stipple="gray50")
+    #                 solid_count = 0
+    #             last_k = k
+    #
+    #         # End of row was solid, and never got a chance to fill in during loop.  Do so now.
+    #         if solid_count > 0:
+    #             self.canvas.create_rectangle(((last_k - solid_count) * 32 + 32, i * 32, last_k * 32 + 32, i * 32 + 32),
+    #                                          fill="gray",
+    #                                          width=1,
+    #                                          stipple="gray50")
 
-            # End of row was solid, and never got a chance to fill in during loop.  Do so now.
-            if solid_count > 0:
-                self.canvas.create_rectangle(((last_k - solid_count) * 32 + 32, i * 32, last_k * 32 + 32, i * 32 + 32),
-                                             fill="gray",
-                                             width=1,
-                                             stipple="gray50")
+    # def draw_height_map(self):
+    #     """Draw the current level's height map"""
+    #     for deco_id, x, y in self.level.decomap:
+    #         if deco_id != 0:
+    #             # self.canvas.create_image((x * 64 + 32, y * 64 + 32), image=TilemapEditorWindow.imgs["height_blank"])
+    #             self.canvas.create_rectangle((x * 64, y * 64, x * 64 + 64, y * 64 + 64),
+    #                                          fill="orange",
+    #                                          outline="orange",
+    #                                          width=2,
+    #                                          stipple="gray50")
+    #             self.canvas.create_text((x * 64 + 32, y * 64 + 32), fill="Dark Red", font="Courier 30 bold",
+    #                                     text=str(TilemapEditorWindow.ids_data["deco_ids"][deco_id]["height"]))
 
-    def draw_height_map(self):
-        """Draw the current level's height map"""
-        for deco_id, x, y in self.level.decomap:
-            if deco_id != 0:
-                # self.canvas.create_image((x * 64 + 32, y * 64 + 32), image=TilemapEditorWindow.imgs["height_blank"])
-                self.canvas.create_rectangle((x * 64, y * 64, x * 64 + 64, y * 64 + 64),
-                                             fill="orange",
-                                             outline="orange",
-                                             width=2,
-                                             stipple="gray50")
-                self.canvas.create_text((x * 64 + 32, y * 64 + 32), fill="Dark Red", font="Courier 30 bold",
-                                        text=str(TilemapEditorWindow.ids_data["deco_ids"][deco_id]["height"]))
+    # def draw_loading_zones(self):
+    #     """Draw the loading zones"""
+    #     for i, j in self.level.loading_zones.items():
+    #         if j.target_level == "":
+    #             self.canvas.create_image((i[0] * 64 + 32, i[1] * 64 + 32),
+    #                                      image=TilemapView.imgs["inactive_zone"])
+    #         else:
+    #             self.canvas.create_image((i[0] * 64 + 32, i[1] * 64 + 32),
+    #                                      image=TilemapView.imgs["active_zone"])
 
-    def draw_loading_zones(self):
-        """Draw the loading zones"""
-        for i, j in self.level.loading_zones.items():
-            if j.target_level == "":
-                self.canvas.create_image((i[0] * 64 + 32, i[1] * 64 + 32),
-                                         image=TilemapView.imgs["inactive_zone"])
-            else:
-                self.canvas.create_image((i[0] * 64 + 32, i[1] * 64 + 32),
-                                         image=TilemapView.imgs["active_zone"])
-
-    def draw_lights(self):
-        """Draw the lights"""
-        for i, j in self.level.lightmap.items():
-            if j.active:
-                self.canvas.create_image((i[0] * 64 + 32, i[1] * 64 + 32),
-                                         image=TilemapView.imgs["active_light"])
-            else:
-                self.canvas.create_image((i[0] * 64 + 32, i[1] * 64 + 32),
-                                         image=TilemapView.imgs["inactive_light"])
+    # def draw_lights(self):
+    #     """Draw the lights"""
+    #     for i, j in self.level.lightmap.items():
+    #         if j.active:
+    #             self.canvas.create_image((i[0] * 64 + 32, i[1] * 64 + 32),
+    #                                      image=TilemapView.imgs["active_light"])
+    #         else:
+    #             self.canvas.create_image((i[0] * 64 + 32, i[1] * 64 + 32),
+    #                                      image=TilemapView.imgs["inactive_light"])
 
     def draw_border(self):
         """Draw the border"""
@@ -2257,22 +2347,27 @@ class TilemapView(tk.Frame):
             del self.image_view
             self.image_view = Image.new('RGBA', (8 * self.level.level_width, 8 * self.level.level_height))
 
-        self.draw_tilemap(update_minimap)
-        self.draw_decomap(update_minimap)
+        for i in (0, 1):
+            self.master.master.layers[i].draw_full(self, update_minimap)
+        # self.draw_tilemap(update_minimap)
+        # self.draw_decomap(update_minimap)
 
         # Draw layer-specific stuff (self.master.master.layer.get())
+        if self.master.master.layer.get() >= 2:
+            self.master.master.layers[self.master.master.layer.get()].draw_full(self)
+
         # Draw collision layer if enabled
-        if self.master.master.layer.get() == 2:
-            self.draw_collision()
-        # Draw height layer if enabled
-        elif self.master.master.layer.get() == 3:
-            self.draw_height_map()
-        # Draw loading zones layer if enabled
-        elif self.master.master.layer.get() == 4:
-            self.draw_loading_zones()
-        # Draw lightmap layer if enabled
-        elif self.master.master.layer.get() == 5:
-            self.draw_lights()
+        # if self.master.master.layer.get() == 2:
+        #     self.draw_collision()
+        # # Draw height layer if enabled
+        # elif self.master.master.layer.get() == 3:
+        #     self.draw_height_map()
+        # # Draw loading zones layer if enabled
+        # elif self.master.master.layer.get() == 4:
+        #     self.draw_loading_zones()
+        # # Draw lightmap layer if enabled
+        # elif self.master.master.layer.get() == 5:
+        #     self.draw_lights()
 
         # Redraw the grid if enabled (self.master.master.grid_mode.get()=1)
         if self.master.master.grid_mode.get():
@@ -2433,225 +2528,6 @@ class TilemapView(tk.Frame):
 
         self.redraw_view()
         self.backup_state()
-
-    # def draw_tile(self, tile_x, tile_y, limited=False):
-    #     """Event callback for drawing a tile on the grid"""
-    #     # Determine the id of the selected tile
-    #     current_tile = self.master.master.visible_pane.selected_id.get()
-    #
-    #     # Draw the tile
-    #     self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
-    #                              image=TilemapEditorWindow.tile_dict[current_tile])
-    #     # Add the tile to the tilemap matrix
-    #     try:
-    #         self.level.tilemap[tile_y][tile_x] = int(current_tile)
-    #     except IndexError:
-    #         pass
-
-    # def draw_deco(self, tile_x, tile_y, limited=False):
-    #     """Draw either a tile or a deco on the grid, depending on the arguments"""
-    #     # Determine the id of the selected tile
-    #     current_tile = self.master.master.visible_pane.selected_id.get()
-    #
-    #     # Draw the tile
-    #     self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
-    #                              image=TilemapEditorWindow.deco_dict[current_tile])
-    #     # Add the tile to the decomap
-    #     if int(current_tile) == 0:
-    #         self.level.decomap.remove(tile_x, tile_y)
-    #     else:
-    #         self.level.decomap.add(tile_x, tile_y, int(current_tile))
-
-    # def draw_collider(self, tile_x, tile_y, limited=False):
-    #     """Event callback for drawing a collider on the grid"""
-    #     # Determine the id of the selected tile
-    #     solid_state = self.master.master.visible_pane.selected_id.get()
-    #
-    #     # Draw the collider
-    #     if solid_state:
-    #         self.canvas.create_rectangle((tile_x * 32, tile_y * 32, tile_x * 32 + 32, tile_y * 32 + 32),
-    #                                      fill="green",
-    #                                      width=1,
-    #                                      stipple="gray50")
-    #     else:
-    #         self.canvas.create_rectangle((tile_x * 32, tile_y * 32, tile_x * 32 + 32, tile_y * 32 + 32),
-    #                                      fill="red",
-    #                                      width=1,
-    #                                      stipple="gray50")
-    #
-    #     # Add the collider to the collider matrix
-    #     try:
-    #         # [ 0, 2 ] -> [0, 1, 2, 3]
-    #         # [ 1, 3 ]
-    #         # Determine which geometry sub-tile to modify
-    #         sub_x = round(tile_x / 2 - tile_x // 2 + 0.1)
-    #         sub_y = round(tile_y / 2 - tile_y // 2 + 0.1)
-    #         # Grab tile ID and layer
-    #         if self.level.decomap[tile_x // 2, tile_y // 2]:
-    #             target_id = self.level.decomap[tile_x // 2, tile_y // 2][-1][0]
-    #             target_set = "deco_ids"
-    #         else:
-    #             target_id = self.level.tilemap[tile_y // 2][tile_x // 2]
-    #             target_set = "tile_ids"
-    #         # Modify tile's geometry
-    #         for i, j in enumerate(TilemapEditorWindow.ids_data[target_set]):
-    #             if j["id"] == target_id:
-    #                 if (sub_x, sub_y) == (0, 0):
-    #                     TilemapEditorWindow.ids_data[target_set][i]["geo"][0] = solid_state
-    #                 elif (sub_x, sub_y) == (0, 1):
-    #                     TilemapEditorWindow.ids_data[target_set][i]["geo"][1] = solid_state
-    #                 elif (sub_x, sub_y) == (1, 0):
-    #                     TilemapEditorWindow.ids_data[target_set][i]["geo"][2] = solid_state
-    #                 elif (sub_x, sub_y) == (1, 1):
-    #                     TilemapEditorWindow.ids_data[target_set][i]["geo"][3] = solid_state
-    #                 break
-    #         self.level.collider[tile_y][tile_x] = solid_state
-    #     except IndexError:
-    #         pass
-
-    # def draw_height(self, tile_x, tile_y, limited=False):
-    #     """Event callback for drawing heights"""
-    #     # Determine the id of the selected tile
-    #     height_option = self.master.master.visible_pane.selected_id.get()
-    #
-    #     # Draw the tile
-    #     self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
-    #                              image=TilemapEditorWindow.height_dict[height_option])
-    #
-    #     # Modify the height value in the ids list
-    #     deco_id = self.level.decomap[tile_x, tile_y]
-    #     # If there was actually a deco at the selected location
-    #     if deco_id is not None:
-    #         for i in deco_id:
-    #             if height_option == 0:
-    #                 TilemapEditorWindow.ids_data["deco_ids"][i[0]]["height"] += 1
-    #             elif height_option == 1:
-    #                 TilemapEditorWindow.ids_data["deco_ids"][i[0]]["height"] += 5
-    #             elif height_option == 2:
-    #                 TilemapEditorWindow.ids_data["deco_ids"][i[0]]["height"] -= 1
-    #             elif height_option == 3:
-    #                 TilemapEditorWindow.ids_data["deco_ids"][i[0]]["height"] -= 5
-
-    # def draw_zone(self, tile_x, tile_y, limited=False):
-    #     """Event callback for editing loading zones"""
-    #     # Determine the id of the selected tile
-    #     mode = self.master.master.visible_pane.selected_id.get()
-    #
-    #     if mode == 0:
-    #         # Delete the zone
-    #         self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
-    #                                  image=TilemapEditorWindow.imgs["delete"])
-    #         if (tile_x, tile_y) in self.level.loading_zones:
-    #             self.level.loading_zones.pop((tile_x, tile_y))
-    #
-    #     elif mode == 1:
-    #         # Add a new zone
-    #         if (tile_x, tile_y) not in self.level.loading_zones:
-    #             self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
-    #                                      image=TilemapView.imgs["inactive_zone"])
-    #             self.level.loading_zones[tile_x, tile_y] = LoadingZone("", [0, 0])
-    #
-    #     elif mode == 2:
-    #         # Edit an existing zone, but only if in safe mode
-    #         if not limited:
-    #             if (tile_x, tile_y) in self.level.loading_zones:
-    #                 self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
-    #                                          image=TilemapEditorWindow.imgs["configure_zone"])
-    #                 data = self.level.loading_zones[tile_x, tile_y]
-    #                 new_data = DataSetDialog(self, [{"Target X": data.target_pos[0], "Target Y": data.target_pos[1]},
-    #                                                 {"Target Level": data.target_level}]).result
-    #                 if new_data is not None:
-    #                     self.level.loading_zones[tile_x, tile_y].target_pos = [int(new_data[0]["Target X"]),
-    #                                                                            int(new_data[0]["Target Y"])]
-    #                     self.level.loading_zones[tile_x, tile_y].target_level = new_data[1]["Target Level"]
-    #             self.redraw_view()
-    #
-    #     elif mode == 3:
-    #         # Copy the existing zone
-    #         self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
-    #                                  image=TilemapEditorWindow.imgs["copy"])
-    #         if (tile_x, tile_y) in self.level.loading_zones:
-    #             self.copied_zone = self.level.loading_zones[tile_x, tile_y].copy()
-    #             self.copied_zone_coords = [tile_x, tile_y]
-    #
-    #     elif mode == 4:
-    #         # Paste the copied zone
-    #         self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
-    #                                  image=TilemapEditorWindow.imgs["paste"])
-    #         if self.copied_zone is not None:
-    #             self.level.loading_zones[tile_x, tile_y] = self.copied_zone.copy()
-    #
-    #     elif mode == 5:
-    #         # Extend the copied zone
-    #         self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
-    #                                  image=TilemapEditorWindow.imgs["extend_zone"])
-    #         if self.copied_zone is not None:
-    #             new_zone = self.copied_zone.copy()
-    #             new_zone.target_pos[0] += tile_x - self.copied_zone_coords[0]
-    #             new_zone.target_pos[1] += tile_y - self.copied_zone_coords[1]
-    #             self.level.loading_zones[tile_x, tile_y] = new_zone
-    #
-    #     elif mode == 6:
-    #         # Open the level referred to by the zone
-    #         # TODO: Fix bug where editor believes this changes the level data
-    #         if not limited:
-    #             self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
-    #                                      image=TilemapEditorWindow.imgs["goto_level"])
-    #             if (tile_x, tile_y) in self.level.loading_zones:
-    #                 destination = self.level.loading_zones[tile_x, tile_y].target_level
-    #                 if destination in App.project_data["levels"]:
-    #                     self.master.master.open_map(App.project_data["levels"][destination]["path"])
-    #                 else:
-    #                     messagebox.showerror("Level Not Found", "The target level was not found in project.json")
-
-    # def draw_light(self, tile_x, tile_y, limited=False):
-    #     """Event callback for drawing a light"""
-    #     # Determine the id of the selected tile
-    #     mode = self.master.master.visible_pane.selected_id.get()
-    #
-    #     if mode == 0:
-    #         # Delete light
-    #         self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
-    #                                  image=TilemapEditorWindow.imgs["delete"])
-    #         if (tile_x, tile_y) in self.level.lightmap:
-    #             self.level.lightmap.pop((tile_x, tile_y))
-    #
-    #     elif mode == 1:
-    #         # Add light
-    #         self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
-    #                                  image=TilemapEditorWindow.imgs["new_light"])
-    #         if (tile_x, tile_y) not in self.level.lightmap:
-    #             red = ColorFade(255, 0, 64)
-    #             green = ColorFade(255, 0, 64)
-    #             blue = ColorFade(255, 0, 64)
-    #             self.level.lightmap[(tile_x, tile_y)] = Light(1, red, green, blue)
-    #
-    #     elif mode == 2:
-    #         # Edit light, but only if in safe mode
-    #         if not limited:
-    #             if (tile_x, tile_y) in self.level.lightmap:
-    #                 self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
-    #                                          image=TilemapEditorWindow.imgs["edit_light"])
-    #                 new_light = LightEditorDialog(self, self.level.lightmap[tile_x, tile_y]).result
-    #                 if new_light is not None:
-    #                     new_light.active = True
-    #                     self.level.lightmap[tile_x, tile_y] = new_light
-    #
-    #         self.redraw_view()
-    #
-    #     elif mode == 3:
-    #         # Copy light
-    #         self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
-    #                                  image=TilemapEditorWindow.imgs["copy"])
-    #         if (tile_x, tile_y) in self.level.lightmap:
-    #             self.copied_light = self.level.lightmap[tile_x, tile_y].copy()
-    #
-    #     elif mode == 4:
-    #         # Paste light
-    #         self.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
-    #                                  image=TilemapEditorWindow.imgs["paste"])
-    #         if self.copied_light is not None:
-    #             self.level.lightmap[tile_x, tile_y] = self.copied_light.copy()
 
     def set_start(self, event):
         """Set the starting position for dragging the canvas around"""
