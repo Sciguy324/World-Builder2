@@ -1703,6 +1703,14 @@ class TilemapLayer(TilemapEditingLayer):
     icon = None
     mini_img_dict = {}
 
+    def enable(self, view):
+        """Set up bindings and enable the layer."""
+        view.canvas.bind("<B1-Motion>", lambda event: view.generic_draw(event, self.draw_individual))
+        view.canvas.bind("<ButtonRelease-1>", lambda event: view.generic_finish_draw(event, self.draw_individual))
+        view.canvas.bind("<ButtonPress-1>", lambda event: view.generic_start_draw(event, self.draw_individual))
+        view.canvas.bind("<ButtonRelease-2>", lambda event: view.draw_line_finish(event, self.draw_individual))
+        view.canvas.bind("<Shift-ButtonPress-1>", lambda event: view.generic_flood_fill(event, self.flood_fill))
+
     def draw_full(self, view, update_minimap=False):
         """Draw the tilemap to the view"""
         for i, j in enumerate(view.level.tilemap):
@@ -1715,6 +1723,35 @@ class TilemapLayer(TilemapEditingLayer):
                                                   mask=TilemapLayer.mini_img_dict[m])
                         else:
                             view.image_view.paste(TilemapLayer.mini_img_dict[m], box=(k * 8, i * 8))
+
+    def flood_fill(self, view, tile_x, tile_y):
+        """Fill the tilemap with the selected tile"""
+        # Recursively fill the tile that was clicked on with -1
+        tile_to_replace = view.level.tilemap[tile_y][tile_x]
+        self._flood_fill(view.level.tilemap, tile_to_replace, tile_x, tile_y)
+
+        # Replace the tiles marked for replacement with the currently selected tile
+        current_tile = view.master.master.visible_pane.selected_id.get()
+        for y, i in enumerate(view.level.tilemap):
+            for x, j in enumerate(i):
+                if j == -1:
+                    view.level.tilemap[y][x] = current_tile
+
+    def _flood_fill(self, tilemap, tile_to_replace, tile_x, tile_y):
+        """Recursive function to fill the tilemap"""
+        tilemap[tile_y][tile_x] = -1
+
+        if tile_x - 1 >= 0 and tilemap[tile_y][tile_x-1] == tile_to_replace:
+            self._flood_fill(tilemap, tile_to_replace, tile_x-1, tile_y)
+
+        if tile_x + 1 < len(tilemap[tile_y]) and tilemap[tile_y][tile_x+1] == tile_to_replace:
+            self._flood_fill(tilemap, tile_to_replace, tile_x+1, tile_y)
+
+        if tile_y - 1 >= 0 and tilemap[tile_y-1][tile_x] == tile_to_replace:
+            self._flood_fill(tilemap, tile_to_replace, tile_x, tile_y-1)
+
+        if tile_y + 1 < len(tilemap) and tilemap[tile_y+1][tile_x] == tile_to_replace:
+            self._flood_fill(tilemap, tile_to_replace, tile_x, tile_y+1)
 
     def draw_individual(self, view, tile_x, tile_y, limited=False):
         """Draw and add an individual tile to the tilemap"""
@@ -2294,7 +2331,7 @@ class TilemapView(tk.Frame):
         """Does the actual work of setting the window's mode"""
         # Unbind the controls
         for i in ["<ButtonRelease-1>", "<ButtonPress-1>", "<B1-Motion>", "<ButtonPress-2>", "<B2-Motion>",
-                  "<ButtonRelease-2>"]:
+                  "<ButtonRelease-2>", "<Shift-B1-Motion>"]:
             self.canvas.unbind(i)
 
         # Set up the control scheme
@@ -2315,6 +2352,13 @@ class TilemapView(tk.Frame):
     def generic_start_draw(self, event, draw_function, limited=False, scale=64, update_save=True):
         self.backup_state()
         self.generic_draw(event, draw_function, limited, scale, update_save)
+
+    def generic_flood_fill(self, event, draw_function, scale=64):
+        if self.check_bounds(event):
+            self.backup_state()
+            tile_x, tile_y = self.event_to_tile(event, scale=scale)
+            draw_function(self, tile_x, tile_y)
+            self.redraw_view()
 
     def generic_draw(self, event, draw_function, limited=False, scale=64, update_save=True):
         """Common drawing function"""
