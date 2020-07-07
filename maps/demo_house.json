@@ -44,7 +44,7 @@
     {
       "zone": [9, 10],
       "target_level": "demo",
-      "target_pos": [28, 7]
+      "target_pos": [28, 7, 1]
     }
   ],
   "lightmap": [

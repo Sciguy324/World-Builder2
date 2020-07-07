@@ -706,6 +706,7 @@ class GroupEditorGroup(tk.Frame):
 
 
 # TODO: Refactor ids list
+# TODO: Make it so editor only compiles minimaps if a level is in project.json
 
 class CustomButton(ttk.Button):
     """A ttk button that has special effects"""
@@ -965,12 +966,15 @@ class TilemapEditorWindow(tk.Frame):
 
         # Create a lookup list of the different layers
         self.layers = [TilemapLayer('<Key-5>'), DecomapLayer('<Key-6>'), CollisionLayer('<Key-7>'),
-                       HeightLayer('<Key-8>'), LoadingZoneLayer('<Key-9>'), LightLayer('<Key-0>')]
+                       HeightLayer('<Key-8>'), StepLayer('<Key-9>'), LoadingZoneLayer('<Key-0>'),
+                       LightLayer('<Key-minus>')]
 
-        self.layer_id_lookup = dict((j, i) for i, j in enumerate(('tile', 'deco', 'collision', 'height', 'loading_zone',
+        self.layer_id_lookup = dict((j, i) for i, j in enumerate(('tile', 'deco', 'collision', 'height', 'step'
+                                                                                                         'loading_zone',
                                                                   'light')))
 
         # Add layer selection buttons (tile, deco, collision, height, loading, light)
+        i = 0
         for i, j in enumerate(self.layers):
             self.layer_button = tk.Radiobutton(self.buttons_bar, indicator=0, value=i, variable=self.layer,
                                                image=j.icon)
@@ -978,19 +982,19 @@ class TilemapEditorWindow(tk.Frame):
 
         # Add another spacing
         self.button_spacing2 = tk.Frame(self.buttons_bar, height=16, width=16)
-        self.button_spacing2.grid(row=0, column=12, sticky=tk.NW)
+        self.button_spacing2.grid(row=0, column=i + 7, sticky=tk.NW)
 
         # Add the tile coordinate label
         self.tile_coords_text = tk.StringVar(self, "Row, Col: ¯\\_(ツ)_/¯", "tile_coords_text")
         self.tile_coords = tk.Label(self.buttons_bar, textvariable=self.tile_coords_text,
                                     borderwidth=1, relief=tk.SUNKEN, padx=5, pady=5)
-        self.tile_coords.grid(row=0, column=13, sticky=tk.W)
+        self.tile_coords.grid(row=0, column=i + 8, sticky=tk.W)
 
         # Add the level coordinate label
         self.level_coords_text = tk.StringVar(self, "X, Y: ¯\\_(ツ)_/¯", "level_coords_text")
         self.level_coords = tk.Label(self.buttons_bar, textvariable=self.level_coords_text,
                                      borderwidth=1, relief=tk.SUNKEN, padx=5, pady=5)
-        self.level_coords.grid(row=0, column=14, sticky=tk.W)
+        self.level_coords.grid(row=0, column=i + 9, sticky=tk.W)
 
         # Set up tool keybindings
         self.keybindings = {"<Key-1>": self.keybind_draw_mode,
@@ -1000,7 +1004,7 @@ class TilemapEditorWindow(tk.Frame):
 
         # Set up the layer keybindings
         for i, j in enumerate(self.layers):
-            self.keybindings[j.keybinding] = lambda event: self.layer.set(i)
+            self.keybindings[j.keybinding] = lambda event, index=i: self.layer.set(index)
 
         # Set up menubar keybindings
         self.keybindings["<Control-o>"] = self._open_map
@@ -1024,7 +1028,7 @@ class TilemapEditorWindow(tk.Frame):
         self.selection_frame = ttk.Frame(self)
         self.selection_frame.grid(row=1, column=2, sticky=tk.E, ipadx=20)
         self.load_groups()
-        #self.set_pane("All", self.layer.get())
+        # self.set_pane("All", self.layer.get())
         self.group.set("All")
 
         # Add the category dropdown box
@@ -1254,6 +1258,7 @@ class TilemapEditorWindow(tk.Frame):
             # Ensure the project.json record is up to date
             TilemapEditorWindow.ids_data[f'{mode}_ids'][new_id] = {"tex": tile_name, "geo": [0, 0, 0, 0]}
             if mode == 'deco':
+                TilemapEditorWindow.ids_data['deco_ids'][new_id]["step_geo"] = [0, 0, 0, 0]
                 TilemapEditorWindow.ids_data['deco_ids'][new_id]["height"] = 1
 
             print(f'Imported {tile_name} from {file_path}')
@@ -1562,6 +1567,12 @@ class TilemapEditorWindow(tk.Frame):
                                      6: cls.imgs["goto_level"]
                                      }
 
+        StepLayer.img_dict = {0: cls.imgs["elevate"],
+                              1: cls.imgs["elevate_fast"],
+                              2: cls.imgs["descend"],
+                              3: cls.imgs["descend_fast"]
+                              }
+
         LightLayer.img_dict = {0: cls.imgs["delete"],
                                1: cls.imgs["new_light"],
                                2: cls.imgs["edit_light"],
@@ -1589,6 +1600,7 @@ class TilemapEditorWindow(tk.Frame):
                     for data in id_list:
                         cls.ids_data[list_name][data["id"]] = {"tex": data["tex"], "geo": data["geo"]}
                         if "height" in data:
+                            cls.ids_data[list_name][data["id"]]["step_geo"] = data["step_geo"]
                             cls.ids_data[list_name][data["id"]]["height"] = data["height"]
 
                 # Load the tiles
@@ -1741,17 +1753,17 @@ class TilemapLayer(TilemapEditingLayer):
         """Recursive function to fill the tilemap"""
         tilemap[tile_y][tile_x] = -1
 
-        if tile_x - 1 >= 0 and tilemap[tile_y][tile_x-1] == tile_to_replace:
-            self._flood_fill(tilemap, tile_to_replace, tile_x-1, tile_y)
+        if tile_x - 1 >= 0 and tilemap[tile_y][tile_x - 1] == tile_to_replace:
+            self._flood_fill(tilemap, tile_to_replace, tile_x - 1, tile_y)
 
-        if tile_x + 1 < len(tilemap[tile_y]) and tilemap[tile_y][tile_x+1] == tile_to_replace:
-            self._flood_fill(tilemap, tile_to_replace, tile_x+1, tile_y)
+        if tile_x + 1 < len(tilemap[tile_y]) and tilemap[tile_y][tile_x + 1] == tile_to_replace:
+            self._flood_fill(tilemap, tile_to_replace, tile_x + 1, tile_y)
 
-        if tile_y - 1 >= 0 and tilemap[tile_y-1][tile_x] == tile_to_replace:
-            self._flood_fill(tilemap, tile_to_replace, tile_x, tile_y-1)
+        if tile_y - 1 >= 0 and tilemap[tile_y - 1][tile_x] == tile_to_replace:
+            self._flood_fill(tilemap, tile_to_replace, tile_x, tile_y - 1)
 
-        if tile_y + 1 < len(tilemap) and tilemap[tile_y+1][tile_x] == tile_to_replace:
-            self._flood_fill(tilemap, tile_to_replace, tile_x, tile_y+1)
+        if tile_y + 1 < len(tilemap) and tilemap[tile_y + 1][tile_x] == tile_to_replace:
+            self._flood_fill(tilemap, tile_to_replace, tile_x, tile_y + 1)
 
     def draw_individual(self, view, tile_x, tile_y, limited=False):
         """Draw and add an individual tile to the tilemap"""
@@ -1842,10 +1854,12 @@ class CollisionLayer(TilemapEditingLayer):
     def draw_full(self, view):
         """Draw the collision map to the view"""
         view.apply_geometry()
+        # Draw the mini-grid
         for i in range(view.level.level_width * 2 + 1):
             view.canvas.create_line(32 * i, 0, 32 * i, 64 * view.level.level_height, fill="BLACK", width=1.0)
         for i in range(view.level.level_height * 2 + 1):
             view.canvas.create_line(0, 32 * i, 64 * view.level.level_width, 32 * i, fill="BLACK", width=1.0)
+        # Draw the collision map
         for i, j in enumerate(view.level.collider):
             solid_count = 0
             last_k = 0
@@ -1874,21 +1888,19 @@ class CollisionLayer(TilemapEditingLayer):
         solid_state = view.master.master.visible_pane.selected_id.get()
 
         # Draw the collider
-        if solid_state:
-            view.canvas.create_rectangle((tile_x * 32, tile_y * 32, tile_x * 32 + 32, tile_y * 32 + 32),
-                                         fill="green",
-                                         width=1,
-                                         stipple="gray50")
-        else:
-            view.canvas.create_rectangle((tile_x * 32, tile_y * 32, tile_x * 32 + 32, tile_y * 32 + 32),
-                                         fill="red",
-                                         width=1,
-                                         stipple="gray50")
+        view.canvas.create_rectangle((tile_x * 32, tile_y * 32, tile_x * 32 + 32, tile_y * 32 + 32),
+                                     fill=('red', 'green')[solid_state],
+                                     width=1,
+                                     stipple="gray50")
 
         # Add the collider to the collider matrix
         try:
             # [ 0, 2 ] -> [0, 1, 2, 3]
             # [ 1, 3 ]
+            # X: 0, Y: 0 -> 0
+            # X: 0, Y: 1 -> 1
+            # X: 1, Y: 0 -> 2
+            # X: 1, Y: 1 -> 3
             # Determine which geometry sub-tile to modify
             sub_x = round(tile_x / 2 - tile_x // 2 + 0.1)
             sub_y = round(tile_y / 2 - tile_y // 2 + 0.1)
@@ -1901,15 +1913,7 @@ class CollisionLayer(TilemapEditingLayer):
                 target_set = "tile_ids"
 
             # Modify tile's geometry
-            if (sub_x, sub_y) == (0, 0):
-                TilemapEditorWindow.ids_data[target_set][target_id]["geo"][0] = solid_state
-            elif (sub_x, sub_y) == (0, 1):
-                TilemapEditorWindow.ids_data[target_set][target_id]["geo"][1] = solid_state
-            elif (sub_x, sub_y) == (1, 0):
-                TilemapEditorWindow.ids_data[target_set][target_id]["geo"][2] = solid_state
-            elif (sub_x, sub_y) == (1, 1):
-                TilemapEditorWindow.ids_data[target_set][target_id]["geo"][3] = solid_state
-
+            TilemapEditorWindow.ids_data[target_set][target_id]["geo"][2*sub_x+sub_y] = solid_state
             view.level.collider[tile_y][tile_x] = solid_state
         except IndexError:
             pass
@@ -1976,6 +1980,82 @@ class HeightLayer(TilemapEditingLayer):
                                                              ''')
 
 
+class StepLayer(TilemapEditingLayer):
+    img_dict = {}
+    icon = None
+
+    def enable(self, view):
+        view.canvas.bind("<ButtonRelease-1>", lambda event: view.redraw_view())
+        view.canvas.bind("<ButtonPress-1>", lambda event: view.generic_start_draw(event, self.draw_individual,
+                                                                                  scale=32,
+                                                                                  update_save=False))
+        view.canvas.bind("<ButtonRelease-2>", lambda event: view.draw_line_finish(event, self.draw_individual,
+                                                                                  scale=32))
+
+    def draw_full(self, view):
+        """Draw the entire step layer to the view"""
+        # Draw the mini-grid
+        for i in range(view.level.level_width * 2 + 1):
+            view.canvas.create_line(32 * i, 0, 32 * i, 64 * view.level.level_height, fill="BLACK", width=1.0)
+        for i in range(view.level.level_height * 2 + 1):
+            view.canvas.create_line(0, 32 * i, 64 * view.level.level_width, 32 * i, fill="BLACK", width=1.0)
+
+        # Draw the step
+        for deco_id, x, y in view.level.decomap:
+            if deco_id != 0:
+                for i, j in enumerate(TilemapEditorWindow.ids_data["deco_ids"][deco_id]["step_geo"]):
+                    sub_x = i // 2 * 32
+                    sub_y = i % 2 * 32
+                    view.canvas.create_rectangle((x * 64 + sub_x, y * 64 + sub_y,
+                                                  x * 64 + 32 + sub_x, y * 64 + 32 + sub_y),
+                                                 fill="blue1",
+                                                 outline="blue1",
+                                                 width=2,
+                                                 stipple="gray50")
+
+                    text = f'+{j}' if j > 0 else str(j)
+                    view.canvas.create_text((x * 64 + 16 + sub_x, y * 64 + 16 + sub_y),
+                                            fill="yellow", font="Courier 15 bold", text=text)
+
+    def draw_individual(self, view, tile_x, tile_y, limited=False):
+        """Draw an individual step"""
+        # Determine the id of the selected tile
+        selected_state = view.master.master.visible_pane.selected_id.get()
+
+        # Draw the indicator
+        color = ('green', 'green1', 'red', 'Dark Red')[selected_state]
+        view.canvas.create_rectangle((tile_x * 32, tile_y * 32, tile_x * 32 + 32, tile_y * 32 + 32),
+                                     fill=color,
+                                     width=1,
+                                     stipple="gray50")
+
+        try:
+            # [ 0, 2 ] -> [0, 1, 2, 3]
+            # [ 1, 3 ]
+            # Determine which geometry sub-tile to modify
+            sub_x = round(tile_x / 2 - tile_x // 2 + 0.1)
+            sub_y = round(tile_y / 2 - tile_y // 2 + 0.1)
+
+            # Only proceed if a deco exists where the user clicked
+            if view.level.decomap[tile_x // 2, tile_y // 2]:
+                # Get the ID of the top-level deco
+                target_id = view.level.decomap[tile_x // 2, tile_y // 2][-1][0]
+
+                # Modify deco's step geometry
+                TilemapEditorWindow.ids_data["deco_ids"][target_id]["step_geo"][sub_x * 2 + sub_y]\
+                    += (1, 5, -1, -5)[selected_state]
+        except IndexError:
+            pass
+
+    @classmethod
+    def _initialize(cls):
+        cls.icon = tk.PhotoImage("img_step_layer", data='''R0lGODlhIAAgAIABAAAAAP + xPCH5BAEKAAEALAAAAAAgACAAAAJfjI + p
+                                                           y + 2 / gJywhkltxQZ7aXnd\nx0EUeJGZk6HqysDHiyJundCAAso2zSvFgD
+                                                           lf8RUUJlVL3JGpeZKi0s9Qp7tikZEtsekVdcPTMVkM\nPu / MauesrfzB3a
+                                                           P5morP6 / f8SgEAOw ==
+                                                           ''')
+
+
 class LoadingZoneLayer(TilemapEditingLayer):
     img_dict = {}
     special_imgs = {}
@@ -2013,7 +2093,7 @@ class LoadingZoneLayer(TilemapEditingLayer):
             if (tile_x, tile_y) not in view.level.loading_zones:
                 view.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
                                          image=LoadingZoneLayer.special_imgs["inactive_zone"])
-                view.level.loading_zones[tile_x, tile_y] = LoadingZone("", [0, 0])
+                view.level.loading_zones[tile_x, tile_y] = LoadingZone("", [0, 0, 0])
 
         elif mode == 2:
             # Edit an existing zone, but only if in safe mode
@@ -2023,14 +2103,17 @@ class LoadingZoneLayer(TilemapEditingLayer):
                                              image=TilemapEditorWindow.imgs["configure_zone"])
                     data = view.level.loading_zones[tile_x, tile_y]
                     new_data = DataSetDialog(view, [{"Target X": data.target_pos[0], "Target Y": data.target_pos[1]},
-                                                    {"Target Level": data.target_level}]).result
+                                                    {"Target Level": data.target_level, "Height": data.target_pos[2]}
+                                                    ]).result
                     if new_data is not None:
                         view.level.loading_zones[tile_x, tile_y].target_pos = [int(new_data[0]["Target X"]),
-                                                                               int(new_data[0]["Target Y"])]
+                                                                               int(new_data[0]["Target Y"]),
+                                                                               int(new_data[1]["Height"])]
                         view.level.loading_zones[tile_x, tile_y].target_level = new_data[1]["Target Level"]
                 view.redraw_view()
 
         elif mode == 3:
+            # TODO: Make copied zone the layer's responsibility
             # Copy the existing zone
             view.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
                                      image=TilemapEditorWindow.imgs["copy"])
@@ -2331,7 +2414,7 @@ class TilemapView(tk.Frame):
         """Does the actual work of setting the window's mode"""
         # Unbind the controls
         for i in ["<ButtonRelease-1>", "<ButtonPress-1>", "<B1-Motion>", "<ButtonPress-2>", "<B2-Motion>",
-                  "<ButtonRelease-2>", "<Shift-B1-Motion>"]:
+                  "<ButtonRelease-2>", "<Shift-ButtonPress-1>"]:
             self.canvas.unbind(i)
 
         # Set up the control scheme
@@ -2451,7 +2534,7 @@ class TilemapView(tk.Frame):
         self.canvas.create_line(self.line_start_x, self.line_start_y, x2, y2,
                                 capstyle=tk.ROUND, fill="blue", stipple="gray50", tag="draw_line", width=10)
 
-    def draw_line_finish(self, event, function):
+    def draw_line_finish(self, event, function, scale=64):
         """Finish drawing the line"""
         if not self.check_bounds(event):
             self.redraw_view()
@@ -2467,8 +2550,8 @@ class TilemapView(tk.Frame):
         # Iterate through the parametric functions to draw the images
         try_tile_x, try_tile_y = 0, 0
         for t in range(101):
-            x = (slope_x * t + self.line_start_x) // 64
-            y = (slope_y * t + self.line_start_y) // 64
+            x = (slope_x * t + self.line_start_x) // scale
+            y = (slope_y * t + self.line_start_y) // scale
             # Only draw the image if the coordinate has not been drawn to already
             if not (try_tile_x == x and try_tile_y == y):
                 try_tile_x, try_tile_y = x, y
@@ -2542,6 +2625,7 @@ class TilemapView(tk.Frame):
                 for _id, data in id_list.items():
                     formatted_ids[list_name].append({"id": _id, "tex": data["tex"], "geo": data["geo"]})
                     if "height" in data:
+                        formatted_ids[list_name][-1]["step_geo"] = data["step_geo"]
                         formatted_ids[list_name][-1]["height"] = data["height"]
 
             # Save the id list to the file in a readable format
