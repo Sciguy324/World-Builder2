@@ -1249,15 +1249,12 @@ class TilemapEditorWindow(tk.Frame):
             img = img.resize((64, 64), Image.NORMAL)
 
             # Tell the relevant layer to handle adding the image
-
             new_id = self.layers[self.layer_id_lookup[mode]].add_to_pane(img, 'All')
 
             # Ensure the project.json record is up to date
-            TilemapEditorWindow.ids_data[f'{mode}_ids'].append({"id": new_id,
-                                                                "tex": tile_name,
-                                                                "geo": [0, 0, 0, 0]})
+            TilemapEditorWindow.ids_data[f'{mode}_ids'][new_id] = {"tex": tile_name, "geo": [0, 0, 0, 0]}
             if mode == 'deco':
-                TilemapEditorWindow.ids_data['deco_ids'][-1]["height"] = 1
+                TilemapEditorWindow.ids_data['deco_ids'][new_id]["height"] = 1
 
             print(f'Imported {tile_name} from {file_path}')
 
@@ -1577,7 +1574,23 @@ class TilemapEditorWindow(tk.Frame):
             # Attempt to read data from file
             with open("assets/ids.json", mode="r") as f:
                 file_data = json.load(f)
-                cls.ids_data = file_data
+
+                # Check for duplicate ids.  Raise an error if one is found
+                for list_name, id_list in file_data.items():
+                    if list_name not in ('tile_ids', 'deco_ids'):
+                        print(f'Warning: \'{list_name}\' not a recognized list, loading anyway.')
+                    if len({i['id'] for i in id_list}) != len(id_list):
+                        messagebox.showerror("Error", f'A duplicate ID was detected in the {list_name} ids list')
+                        raise KeyError(f'A duplicate ID was detected in the {list_name} ids list')
+
+                # Parse the ids data
+                for list_name, id_list in file_data.items():
+                    cls.ids_data[list_name] = {}
+                    for data in id_list:
+                        cls.ids_data[list_name][data["id"]] = {"tex": data["tex"], "geo": data["geo"]}
+                        if "height" in data:
+                            cls.ids_data[list_name][data["id"]]["height"] = data["height"]
+
                 # Load the tiles
                 for i in file_data["tile_ids"]:
                     img = Image.open("tiles/" + i["tex"])
@@ -1849,18 +1862,17 @@ class CollisionLayer(TilemapEditingLayer):
             else:
                 target_id = view.level.tilemap[tile_y // 2][tile_x // 2]
                 target_set = "tile_ids"
+
             # Modify tile's geometry
-            for i, j in enumerate(TilemapEditorWindow.ids_data[target_set]):
-                if j["id"] == target_id:
-                    if (sub_x, sub_y) == (0, 0):
-                        TilemapEditorWindow.ids_data[target_set][i]["geo"][0] = solid_state
-                    elif (sub_x, sub_y) == (0, 1):
-                        TilemapEditorWindow.ids_data[target_set][i]["geo"][1] = solid_state
-                    elif (sub_x, sub_y) == (1, 0):
-                        TilemapEditorWindow.ids_data[target_set][i]["geo"][2] = solid_state
-                    elif (sub_x, sub_y) == (1, 1):
-                        TilemapEditorWindow.ids_data[target_set][i]["geo"][3] = solid_state
-                    break
+            if (sub_x, sub_y) == (0, 0):
+                TilemapEditorWindow.ids_data[target_set][target_id]["geo"][0] = solid_state
+            elif (sub_x, sub_y) == (0, 1):
+                TilemapEditorWindow.ids_data[target_set][target_id]["geo"][1] = solid_state
+            elif (sub_x, sub_y) == (1, 0):
+                TilemapEditorWindow.ids_data[target_set][target_id]["geo"][2] = solid_state
+            elif (sub_x, sub_y) == (1, 1):
+                TilemapEditorWindow.ids_data[target_set][target_id]["geo"][3] = solid_state
+
             view.level.collider[tile_y][tile_x] = solid_state
         except IndexError:
             pass
@@ -2443,22 +2455,18 @@ class TilemapView(tk.Frame):
 
         # Apply tile geometry
         for y, i in enumerate(self.level.tilemap):
-            for x, j in enumerate(i):
-                for k in TilemapEditorWindow.ids_data["tile_ids"]:
-                    if k["id"] == j:
-                        self.level.collider[y * 2][x * 2] = k["geo"][0]
-                        self.level.collider[y * 2 + 1][x * 2] = k["geo"][1]
-                        self.level.collider[y * 2][x * 2 + 1] = k["geo"][2]
-                        self.level.collider[y * 2 + 1][x * 2 + 1] = k["geo"][3]
+            for x, _id in enumerate(i):
+                self.level.collider[y * 2][x * 2] = TilemapEditorWindow.ids_data["tile_ids"][_id]["geo"][0]
+                self.level.collider[y * 2 + 1][x * 2] = TilemapEditorWindow.ids_data["tile_ids"][_id]["geo"][1]
+                self.level.collider[y * 2][x * 2 + 1] = TilemapEditorWindow.ids_data["tile_ids"][_id]["geo"][2]
+                self.level.collider[y * 2 + 1][x * 2 + 1] = TilemapEditorWindow.ids_data["tile_ids"][_id]["geo"][3]
 
         # Apply deco geometry
         for deco_id, x, y in self.level.decomap:
-            for i in TilemapEditorWindow.ids_data["deco_ids"]:
-                if i["id"] == deco_id:
-                    self.level.collider[y * 2][x * 2] ^= i["geo"][0]
-                    self.level.collider[y * 2 + 1][x * 2] ^= i["geo"][1]
-                    self.level.collider[y * 2][x * 2 + 1] ^= i["geo"][2]
-                    self.level.collider[y * 2 + 1][x * 2 + 1] ^= i["geo"][3]
+            self.level.collider[y * 2][x * 2] ^= TilemapEditorWindow.ids_data["deco_ids"][deco_id]["geo"][0]
+            self.level.collider[y * 2 + 1][x * 2] ^= TilemapEditorWindow.ids_data["deco_ids"][deco_id]["geo"][1]
+            self.level.collider[y * 2][x * 2 + 1] ^= TilemapEditorWindow.ids_data["deco_ids"][deco_id]["geo"][2]
+            self.level.collider[y * 2 + 1][x * 2 + 1] ^= TilemapEditorWindow.ids_data["deco_ids"][deco_id]["geo"][3]
 
     def load_from_file(self, file):
         """Loads level data from a .json file"""
@@ -2483,9 +2491,20 @@ class TilemapView(tk.Frame):
         """Saves the level data to a .json file"""
         # Save the ids_data to ids.json
         with open("assets/ids.json", mode="w") as f:
-            ids_data = json.dumps(TilemapEditorWindow.ids_data, indent=2)
+            # Format the ids data
+            formatted_ids = {}
+            for list_name, id_list in TilemapEditorWindow.ids_data.items():
+                formatted_ids[list_name] = []
+                for _id, data in id_list.items():
+                    formatted_ids[list_name].append({"id": _id, "tex": data["tex"], "geo": data["geo"]})
+                    if "height" in data:
+                        formatted_ids[list_name][-1]["height"] = data["height"]
+
+            # Save the id list to the file in a readable format
+            ids_data = json.dumps(formatted_ids, indent=2)
             ids_data = re.sub(r'\[\s+(\d),\s+(\d),\s+(\d),\s+(\d)\s+\]', r'[\1, \2, \3, \4]', ids_data)
             f.write(ids_data)
+
         # If this file is NOT part of the project and hasn't been excluded, ask whether it should be.
         print("Ignore level from project:", self.level.ignore_from_project)
         if not self.level.ignore_from_project:
@@ -2843,7 +2862,6 @@ class Decomap:
 
     def sort(self):
         """Sort the decomap elements in order of height+row"""
-        # TODO: Make accessing tiles in ids_data dependent on actual id tag
         self.values = sorted(self.values, key=lambda x: TilemapEditorWindow.ids_data["deco_ids"][x[0]]["height"] + x[2])
 
     def jsonify(self):
@@ -3768,7 +3786,7 @@ class Sprite:
                              "facing_type": self.facing_type,
                              "animation": dict((i, j.__dict__) for i, j in self.animation.items()),
                              "stats": self.stats.__dict__},
-                            indent=4)
+                            indent=2)
 
         # Format the json string using regular expressions
         result = re.sub(r'\s+([0-9.\-]+),', r'\1, ', result)
