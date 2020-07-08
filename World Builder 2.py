@@ -707,6 +707,7 @@ class GroupEditorGroup(tk.Frame):
 
 # TODO: Refactor ids list
 # TODO: Make it so editor only compiles minimaps if a level is in project.json
+# TODO: Consider merging height zones and loading zones
 
 class CustomButton(ttk.Button):
     """A ttk button that has special effects"""
@@ -1258,7 +1259,6 @@ class TilemapEditorWindow(tk.Frame):
             # Ensure the project.json record is up to date
             TilemapEditorWindow.ids_data[f'{mode}_ids'][new_id] = {"tex": tile_name, "geo": [0, 0, 0, 0]}
             if mode == 'deco':
-                TilemapEditorWindow.ids_data['deco_ids'][new_id]["step_geo"] = [0, 0, 0, 0]
                 TilemapEditorWindow.ids_data['deco_ids'][new_id]["height"] = 1
 
             print(f'Imported {tile_name} from {file_path}')
@@ -1600,7 +1600,6 @@ class TilemapEditorWindow(tk.Frame):
                     for data in id_list:
                         cls.ids_data[list_name][data["id"]] = {"tex": data["tex"], "geo": data["geo"]}
                         if "height" in data:
-                            cls.ids_data[list_name][data["id"]]["step_geo"] = data["step_geo"]
                             cls.ids_data[list_name][data["id"]]["height"] = data["height"]
 
                 # Load the tiles
@@ -1683,7 +1682,7 @@ class TilemapEditingLayer:
             if name != "All":
                 pane.forget()
                 pane.destroy()
-                del self.panes["tile"][name]
+                del self.panes[name]
 
     def show_pane(self, pane_name):
         """Show the given pane"""
@@ -1799,15 +1798,16 @@ class DecomapLayer(TilemapEditingLayer):
     def draw_full(self, view, update_minimap=False):
         """Draw the current level's decomap"""
         view.level.decomap.sort()
-        for deco_id, x, y in view.level.decomap:
-            if deco_id != 0:
-                view.canvas.create_image((x * 64 + 32, y * 64 + 32), image=DecomapLayer.img_dict[deco_id])
+        for deco in view.level.decomap:
+            if deco.deco_id != 0:
+                view.canvas.create_image((deco.x * 64 + 32, deco.y * 64 + 32),
+                                         image=DecomapLayer.img_dict[deco.deco_id])
                 if update_minimap:
-                    if DecomapLayer.mini_img_dict[deco_id].mode == 'RGBA':
-                        view.image_view.paste(DecomapLayer.mini_img_dict[deco_id], box=(x * 8, y * 8),
-                                              mask=DecomapLayer.mini_img_dict[deco_id])
+                    if DecomapLayer.mini_img_dict[deco.deco_id].mode == 'RGBA':
+                        view.image_view.paste(DecomapLayer.mini_img_dict[deco.deco_id], box=(deco.x * 8, deco.y * 8),
+                                              mask=DecomapLayer.mini_img_dict[deco.deco_id])
                     else:
-                        view.image_view.paste(DecomapLayer.mini_img_dict[deco_id], box=(x * 8, y * 8))
+                        view.image_view.paste(DecomapLayer.mini_img_dict[deco.deco_id], box=(deco.x * 8, deco.y * 8))
 
     def draw_individual(self, view, tile_x, tile_y, limited=False):
         current_tile = view.master.master.visible_pane.selected_id.get()
@@ -1819,7 +1819,8 @@ class DecomapLayer(TilemapEditingLayer):
         if int(current_tile) == 0:
             view.level.decomap.remove(tile_x, tile_y)
         else:
-            view.level.decomap.add(tile_x, tile_y, int(current_tile))
+            view.level.decomap.add(int(current_tile), tile_x, tile_y,
+                                   TilemapEditorWindow.ids_data["deco_ids"][current_tile]["height"])
 
     @property
     def pane_options(self):
@@ -1933,24 +1934,41 @@ class HeightLayer(TilemapEditingLayer):
 
     def enable(self, view):
         view.canvas.bind("<ButtonRelease-1>", lambda event: view.redraw_view())
-        view.canvas.bind("<ButtonPress-1>", lambda event: view.generic_start_draw(event, self.draw_individual,
+        view.canvas.bind("<ButtonPress-1>", lambda event: view.generic_start_draw(event, self.modify_selected,
                                                                                   update_save=False))
-        view.canvas.bind("<ButtonRelease-2>", lambda event: view.draw_line_finish(event, self.draw_individual))
+        view.canvas.bind("<Shift-ButtonPress-1>", lambda event: view.generic_start_draw(event, self.modify_default,
+                                                                                        update_save=False))
+        view.canvas.bind("<Control-ButtonPress-1>", lambda event: view.generic_start_draw(event, self.reset_selected,
+                                                                                          update_save=False))
+        view.canvas.bind("<ButtonRelease-2>", lambda event: view.draw_line_finish(event, self.modify_selected))
 
     def draw_full(self, view):
         """Draw the height map to the view"""
-        for deco_id, x, y in view.level.decomap:
-            if deco_id != 0:
+        for i in view.level.decomap:
+            if i.deco_id != 0:
                 # self.canvas.create_image((x * 64 + 32, y * 64 + 32), image=TilemapEditorWindow.imgs["height_blank"])
-                view.canvas.create_rectangle((x * 64, y * 64, x * 64 + 64, y * 64 + 64),
+                view.canvas.create_rectangle((i.x * 64, i.y * 64, i.x * 64 + 64, i.y * 64 + 64),
                                              fill="orange",
                                              outline="orange",
                                              width=2,
                                              stipple="gray50")
-                view.canvas.create_text((x * 64 + 32, y * 64 + 32), fill="Dark Red", font="Courier 30 bold",
-                                        text=str(TilemapEditorWindow.ids_data["deco_ids"][deco_id]["height"]))
+                view.canvas.create_text((i.x * 64 + 32, i.y * 64 + 32), fill="Dark Red", font="Courier 30 bold",
+                                        text=str(i.height))
 
-    def draw_individual(self, view, tile_x, tile_y, limited=False):
+    def modify_selected(self, view, tile_x, tile_y, limited=False):
+        """Modify the height of the selected tile"""
+        self.common_draw(view, tile_x, tile_y, self._modify_selected, limited)
+
+    def modify_default(self, view, tile_x, tile_y, limited=False):
+        """Modify the height of the selected tile"""
+        self.common_draw(view, tile_x, tile_y, self._modify_default, limited)
+
+    def reset_selected(self, view, tile_x, tile_y, limited=False):
+        """Modify the height of the selected tile"""
+        self.common_draw(view, tile_x, tile_y, self._reset_selected, limited)
+
+    @staticmethod
+    def common_draw(view, tile_x, tile_y, function, limited=False):
         # Determine the id of the selected tile
         height_option = view.master.master.visible_pane.selected_id.get()
 
@@ -1959,18 +1977,26 @@ class HeightLayer(TilemapEditingLayer):
                                  image=HeightLayer.img_dict[height_option])
 
         # Modify the height value in the ids list
-        deco_id = view.level.decomap[tile_x, tile_y]
-        # If there was actually a deco at the selected location
-        if deco_id is not None:
-            for i in deco_id:
-                if height_option == 0:
-                    TilemapEditorWindow.ids_data["deco_ids"][i[0]]["height"] += 1
-                elif height_option == 1:
-                    TilemapEditorWindow.ids_data["deco_ids"][i[0]]["height"] += 5
-                elif height_option == 2:
-                    TilemapEditorWindow.ids_data["deco_ids"][i[0]]["height"] -= 1
-                elif height_option == 3:
-                    TilemapEditorWindow.ids_data["deco_ids"][i[0]]["height"] -= 5
+        decos = view.level.decomap[tile_x, tile_y]
+
+        # Check if there was actually a deco at the selected location
+        if decos is not None:
+            for i in decos:
+                function(i, height_option)
+
+    @staticmethod
+    def _modify_selected(deco, height_option):
+        deco.height += (1, 5, -1, -5)[height_option]
+
+    # TODO: Add a better way to modify the default height
+    @staticmethod
+    def _modify_default(deco, height_option):
+        TilemapEditorWindow.ids_data["deco_ids"][deco.deco_id]["height"] += (1, 5, -1, -5)[height_option]
+        deco.height = TilemapEditorWindow.ids_data["deco_ids"][deco.deco_id]["height"]
+
+    @staticmethod
+    def _reset_selected(deco, height_option=None):
+        deco.height = TilemapEditorWindow.ids_data["deco_ids"][deco.deco_id]["height"]
 
     @classmethod
     def _initialize(cls):
@@ -2001,21 +2027,23 @@ class StepLayer(TilemapEditingLayer):
             view.canvas.create_line(0, 32 * i, 64 * view.level.level_width, 32 * i, fill="BLACK", width=1.0)
 
         # Draw the step
-        for deco_id, x, y in view.level.decomap:
+        for deco in view.level.decomap:
+            deco_id, x, y = deco.deco_id, deco.x, deco.y
             if deco_id != 0:
                 for i, j in enumerate(TilemapEditorWindow.ids_data["deco_ids"][deco_id]["step_geo"]):
                     sub_x = i // 2 * 32
                     sub_y = i % 2 * 32
                     view.canvas.create_rectangle((x * 64 + sub_x, y * 64 + sub_y,
                                                   x * 64 + 32 + sub_x, y * 64 + 32 + sub_y),
-                                                 fill="blue1",
-                                                 outline="blue1",
+                                                 fill=("blue1", "red")[int(j <= 0)],
+                                                 outline=("blue1", "red")[int(j <= 0)],
                                                  width=2,
-                                                 stipple="gray50")
+                                                 stipple="gray25")
 
-                    text = f'+{j}' if j > 0 else str(j)
+                    text = str(j) if j > 0 else ""
+
                     view.canvas.create_text((x * 64 + 16 + sub_x, y * 64 + 16 + sub_y),
-                                            fill="yellow", font="Courier 15 bold", text=text)
+                                            fill="yellow", font="Courier 12 bold", text=text)
 
     def draw_individual(self, view, tile_x, tile_y, limited=False):
         """Draw an individual step"""
@@ -2044,6 +2072,8 @@ class StepLayer(TilemapEditingLayer):
                 # Modify deco's step geometry
                 TilemapEditorWindow.ids_data["deco_ids"][target_id]["step_geo"][sub_x * 2 + sub_y]\
                     += (1, 5, -1, -5)[selected_state]
+                if TilemapEditorWindow.ids_data["deco_ids"][target_id]["step_geo"][sub_x * 2 + sub_y] < 0:
+                    TilemapEditorWindow.ids_data["deco_ids"][target_id]["step_geo"][sub_x * 2 + sub_y] = 0
         except IndexError:
             pass
 
@@ -2589,7 +2619,8 @@ class TilemapView(tk.Frame):
                 self.level.collider[y * 2 + 1][x * 2 + 1] = TilemapEditorWindow.ids_data["tile_ids"][_id]["geo"][3]
 
         # Apply deco geometry
-        for deco_id, x, y in self.level.decomap:
+        for deco in self.level.decomap:
+            deco_id, x, y = deco.deco_id, deco.x, deco.y
             self.level.collider[y * 2][x * 2] ^= TilemapEditorWindow.ids_data["deco_ids"][deco_id]["geo"][0]
             self.level.collider[y * 2 + 1][x * 2] ^= TilemapEditorWindow.ids_data["deco_ids"][deco_id]["geo"][1]
             self.level.collider[y * 2][x * 2 + 1] ^= TilemapEditorWindow.ids_data["deco_ids"][deco_id]["geo"][2]
@@ -2625,7 +2656,6 @@ class TilemapView(tk.Frame):
                 for _id, data in id_list.items():
                     formatted_ids[list_name].append({"id": _id, "tex": data["tex"], "geo": data["geo"]})
                     if "height" in data:
-                        formatted_ids[list_name][-1]["step_geo"] = data["step_geo"]
                         formatted_ids[list_name][-1]["height"] = data["height"]
 
             # Save the id list to the file in a readable format
@@ -2753,6 +2783,7 @@ class Level:
         self.default_start = [0, 0]
         self.lightmap = LightmapDict()
         self.loading_zones = LoadingZoneDict()
+        self.height_zones = HeightZoneDict()
 
         # Special Status data
         self.ignore_from_project = False
@@ -2777,12 +2808,17 @@ class Level:
             self.level_height = len(self.tilemap)
             self.decomap = Decomap()
             # Note: This is still here in case I ever need to upgrade an older map
-            #        for i, j in enumerate(data["decomap"]):
-            #            for k, m in enumerate(j):
+            #        for y, j in enumerate(data["decomap"]):
+            #            for x, m in enumerate(j):
             #                if m != 0:
-            #                    self.decomap.add(k, i, m)
-            for i, j, k in data["decomap"]:
-                self.decomap.add(j, k, i)
+            #                    self.decomap.add(m, x, y, TilemapEditorWindow.ids_data["deco_ids"][m]["height"])
+
+            try:
+                for i, j, k, l in data["decomap"]:
+                    self.decomap.add(i, j, k, l)
+            except ValueError:
+                for i, j, k in data["decomap"]:
+                    self.decomap.add(i, j, k, TilemapEditorWindow.ids_data["deco_ids"][i]["height"])
 
             self.collider = [[0] * (self.level_width * 2) for i in range(self.level_height * 2)]
             self.loading_zones = LoadingZoneDict()
@@ -2793,6 +2829,8 @@ class Level:
                 green = ColorFade(i["green"]["amplitude"], i["green"]["inner_diameter"], i["green"]["outer_diameter"])
                 blue = ColorFade(i["blue"]["amplitude"], i["blue"]["inner_diameter"], i["blue"]["outer_diameter"])
                 self.lightmap[i["pos"][0], i["pos"][1]] = Light(i["diameter"], red, green, blue, i["blacklight"], True)
+            for i in data["height_zones"]:
+                self.height_zones[i["zone"][0], i["zone"][1]] = HeightZone(i["height"], i["target_height"])
             self.default_start = data["spawn"]
             self.name = data["name"]
             if self.name in App.project_data["levels"]:
@@ -2920,6 +2958,17 @@ class Level:
         return result
 
 
+@dataclass
+class Deco:
+    deco_id: int
+    x: int
+    y: int
+    height: int
+
+    def copy(self):
+        return Deco(self.deco_id, self.x, self.y, self.height)
+
+
 class Decomap:
     """Container structure for decomap data"""
 
@@ -2934,7 +2983,7 @@ class Decomap:
     def __getitem__(self, key):
         """Get a list of all entries with the given coordinates"""
         if len(key) == 2 and type(key[0]) == int and type(key[1]) == int:
-            result = [i for i in self.values if i[1] == key[0] and i[2] == key[1]]
+            result = [i for i in self.values if i.x == key[0] and i.y == key[1]]
             if len(result) == 0:
                 return None
             else:
@@ -2945,12 +2994,12 @@ class Decomap:
     def __contains__(self, key):
         """Check if decomap contains something at the coordinates x-y (deco-id is optional)"""
         if len(key) == 2 and type(key[0]) == int and type(key[1]) == int:
-            for deco_id, x, y in self.values:
-                if x == key[0] and y == key[1]:
+            for i in self.values:
+                if i.x == key[0] and i.y == key[1]:
                     return True
         elif len(key) == 3 and all([type(i) == int for i in key]):
-            for deco_id, x, y in self.values:
-                if x == key[0] and y == key[1] and deco_id == key[2]:
+            for i in self.values:
+                if i.x == key[0] and i.y == key[1] and i.deco_id == key[2]:
                     return True
         else:
             raise TypeError("'{}' is not a valid key!".format(key))
@@ -2966,38 +3015,39 @@ class Decomap:
         result.values = [i.copy() for i in self.values]
         return result
 
-    def add(self, x, y, deco_id):
+    def add(self, deco_id, x, y, height):
         """Add an item to the decomap"""
         already_exists = False
-        for i, j, k in self.values:
-            if j == x and k == y and i == deco_id:
+        for deco in self.values:
+            if deco.deco_id == deco_id and deco.x == x and deco.y == y:
                 already_exists = True
+                break
 
         if not already_exists:
-            self.values.append([deco_id, x, y])
+            self.values.append(Deco(deco_id, x, y, height))
 
     def remove(self, x, y, deco_id=None):
         """Remove all items at the coordinates x-y from the decomap"""
         if deco_id:
-            self.values = [[i, j, k] for i, j, k in self.values if not (j == x and k == y and i == deco_id)]
+            self.values = [i for i in self.values if not (i.x == x and i.y == y and i.deco_id == deco_id)]
         else:
-            self.values = [[i, j, k] for i, j, k in self.values if not (j == x and k == y)]
+            self.values = [i for i in self.values if not (i.x == x and i.y == y)]
 
-    def set(self, x, y, deco_id):
-        """Remove all entries that have the given coordinates and append a new value"""
+    def set(self, x, y, deco_id, height):
+        """Remove all entries that have the given coordinates and append a new value with a given height"""
         self.remove(x, y)
-        self.add(x, y, deco_id)
+        self.add(x, y, deco_id, height)
 
     def sort(self):
         """Sort the decomap elements in order of height+row"""
-        self.values = sorted(self.values, key=lambda x: TilemapEditorWindow.ids_data["deco_ids"][x[0]]["height"] + x[2])
+        self.values = sorted(self.values, key=lambda x: x.height + x.y)
 
     def jsonify(self):
         """Convert the decomap into json format"""
         # Ensure decomap is properly sorted
         self.sort()
         # Return a copy
-        return self.copy().values
+        return [[i.deco_id, i.x, i.y, i.height] for i in self.values]
 
 
 @dataclass
@@ -3009,6 +3059,17 @@ class LoadingZone:
     def copy(self):
         """Return a copy of the loading zone"""
         return LoadingZone(self.target_level, self.target_pos.copy())
+
+
+@dataclass
+class HeightZone:
+    """Data structure for loading zones"""
+    height: int
+    target_height: int
+
+    def copy(self):
+        """Return a copy of the loading zone"""
+        return HeightZone(self.height, self.target_height)
 
 
 @dataclass
@@ -3081,7 +3142,7 @@ class CoordinateDict:
     @staticmethod
     def check_key(key):
         """Check the type of a key to make sure it is compatible.  Override in subclass"""
-        return True
+        return type(key) == tuple and len(key) == 2 and type(key[0]) == int and type(key[1]) == int
 
     @staticmethod
     def check_type(value):
@@ -3107,11 +3168,6 @@ class LoadingZoneDict(CoordinateDict):
     # [{"zone":[x, y], "target_level": "Level Name", "target_pos": [x, y]},{}...]
 
     @staticmethod
-    def check_key(key):
-        """Check to ake sure the key is a pair of integers"""
-        return type(key) == tuple and len(key) == 2 and type(key[0]) == int and type(key[1]) == int
-
-    @staticmethod
     def check_type(value):
         """Check to make sure the value type is a LoadingZone"""
         return type(value) == LoadingZone
@@ -3129,6 +3185,33 @@ class LoadingZoneDict(CoordinateDict):
             result.append({"zone": list(i),
                            "target_level": j.target_level,
                            "target_pos": j.target_pos})
+        return result
+
+
+class HeightZoneDict(CoordinateDict):
+    """Data structure for height zone lists"""
+
+    # Structure:
+    # [{"zone":[x, y], "height": height, "target_height": target_height}]
+
+    @staticmethod
+    def check_type(value):
+        """Check to make sure the value type is a HeightZone"""
+        return type(value) == HeightZone
+
+    def copy(self):
+        """Return a new copy of the height zone dictionary"""
+        result = HeightZoneDict()
+        result.data = self.data.copy()
+        return result
+
+    def jsonify(self):
+        """Convert into a list representation for use in a JSON tag"""
+        result = []
+        for i, j in self.data.items():
+            result.append({"zone": list(i),
+                           "height": j.height,
+                           "target_height": j.target_height})
         return result
 
 

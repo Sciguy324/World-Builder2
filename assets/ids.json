@@ -446,245 +446,306 @@
       "id": 0,
       "tex": "box.png",
       "geo": [0, 0, 0, 0],
-      "step_geo": [0, 0, 0, 0],
       "height": 1
     },
     {
       "id": 1,
       "tex": "lamp_post_top.png",
       "geo": [0, 0, 0, 0],
-      "step_geo": [0, 0, 0, 0],
       "height": 2
     },
     {
       "id": 2,
       "tex": "table_top_left.png",
       "geo": [0, 1, 0, 1],
-      "step_geo": [0, 0, 0, 0],
       "height": 1
     },
     {
       "id": 3,
       "tex": "table_top.png",
       "geo": [0, 0, 0, 0],
-      "step_geo": [0, 0, 0, 0],
       "height": 1
     },
     {
       "id": 4,
       "tex": "table_top_right.png",
       "geo": [0, 1, 0, 1],
-      "step_geo": [0, 0, 0, 0],
       "height": 1
     },
     {
       "id": 5,
       "tex": "roof_right_bottom.png",
       "geo": [0, 0, 0, 0],
-      "step_geo": [0, 0, 0, 0],
       "height": 3
     },
     {
       "id": 6,
       "tex": "roof_right_middle1.png",
       "geo": [0, 0, 0, 0],
-      "step_geo": [0, 0, 0, 0],
       "height": 3
     },
     {
       "id": 7,
       "tex": "roof_right_middle2.png",
       "geo": [0, 0, 0, 0],
-      "step_geo": [0, 0, 0, 0],
       "height": 1
     },
     {
       "id": 8,
       "tex": "roof_right_top.png",
       "geo": [0, 0, 0, 0],
-      "step_geo": [0, 0, 0, 0],
       "height": 3
     },
     {
       "id": 9,
       "tex": "roof_left_bottom.png",
       "geo": [0, 0, 0, 0],
-      "step_geo": [0, 0, 0, 0],
       "height": 3
     },
     {
       "id": 10,
       "tex": "roof_left_middle1.png",
       "geo": [0, 0, 0, 0],
-      "step_geo": [0, 0, 0, 0],
       "height": 3
     },
     {
       "id": 11,
       "tex": "roof_left_middle2.png",
       "geo": [0, 0, 0, 0],
-      "step_geo": [0, 0, 0, 0],
       "height": 1
     },
     {
       "id": 12,
       "tex": "roof_left_top.png",
       "geo": [0, 0, 0, 0],
-      "step_geo": [0, 0, 0, 0],
       "height": 3
     },
     {
       "id": 13,
       "tex": "roof_top1.png",
       "geo": [0, 0, 0, 0],
-      "step_geo": [0, 0, 0, 0],
       "height": 3
     },
     {
       "id": 14,
       "tex": "roof_top2.png",
       "geo": [0, 0, 0, 0],
-      "step_geo": [0, 0, 0, 0],
       "height": 3
     },
     {
       "id": 15,
       "tex": "top_roof_shadow.png",
       "geo": [0, 0, 0, 0],
-      "step_geo": [0, 0, 0, 0],
       "height": 3
     },
     {
       "id": 16,
       "tex": "pink_wall_top.png",
       "geo": [0, 0, 0, 0],
-      "step_geo": [0, 0, 0, 0],
       "height": 1
     },
     {
       "id": 17,
       "tex": "white_green_wall_top_rimmed.png",
       "geo": [0, 0, 0, 0],
-      "step_geo": [0, 0, 0, 0],
       "height": 1
     },
     {
       "id": 18,
       "tex": "white_green_wall_painting_top.png",
       "geo": [0, 0, 0, 0],
-      "step_geo": [0, 0, 0, 0],
       "height": 1
     },
     {
       "id": 19,
       "tex": "white_green_wall_clock.png",
       "geo": [0, 0, 0, 0],
-      "step_geo": [0, 0, 0, 0],
       "height": 1
     },
     {
       "id": 20,
       "tex": "lamp.png",
       "geo": [0, 0, 0, 0],
-      "step_geo": [0, 0, 0, 0],
       "height": 1
     },
     {
       "id": 21,
       "tex": "white_green_wall_top_left.png",
       "geo": [0, 0, 0, 0],
-      "step_geo": [0, 0, 0, 0],
       "height": 1
     },
     {
       "id": 22,
       "tex": "white_green_wall_top.png",
       "geo": [0, 0, 0, 0],
-      "step_geo": [0, 0, 0, 0],
       "height": 1
     },
     {
       "id": 23,
       "tex": "white_green_wall_top_right.png",
       "geo": [0, 0, 0, 0],
-      "step_geo": [0, 0, 0, 0],
       "height": 1
     },
     {
       "id": 24,
       "tex": "roof_right_edge.png",
       "geo": [0, 0, 0, 0],
-      "step_geo": [0, 0, 0, 0],
       "height": 3
     },
     {
       "id": 25,
       "tex": "roof_left_edge.png",
       "geo": [0, 0, 0, 0],
-      "step_geo": [0, 0, 0, 0],
       "height": 3
     },
     {
       "id": 26,
       "tex": "tree_top_left.png",
       "geo": [0, 0, 0, 0],
-      "step_geo": [0, 0, 0, 0],
       "height": 3
     },
     {
       "id": 27,
       "tex": "tree_top.png",
       "geo": [0, 0, 0, 0],
-      "step_geo": [0, 0, 0, 0],
       "height": 3
     },
     {
       "id": 29,
       "tex": "tree_mid_left.png",
       "geo": [0, 0, 0, 0],
-      "step_geo": [0, 0, 0, 0],
-      "height": 3
+      "height": 2
     },
     {
       "id": 28,
       "tex": "tree_top_right.png",
       "geo": [0, 0, 0, 0],
-      "step_geo": [0, 0, 0, 0],
-      "height": 2
+      "height": 3
     },
     {
       "id": 30,
       "tex": "tree_mid.png",
       "geo": [0, 0, 0, 0],
-      "step_geo": [0, 0, 0, 0],
       "height": 2
     },
     {
       "id": 31,
       "tex": "tree_mid_right.png",
       "geo": [0, 0, 0, 0],
-      "step_geo": [0, 0, 0, 0],
       "height": 2
     },
     {
       "id": 32,
       "tex": "tree_trunk.png",
       "geo": [0, 1, 0, 1],
-      "step_geo": [0, 0, 0, 0],
       "height": 1
     },
     {
       "id": 33,
       "tex": "lamp_post_bottom.png",
       "geo": [0, 1, 0, 1],
-      "step_geo": [0, 0, 0, 0],
       "height": 1
     },
     {
       "id": 34,
       "tex": "table.png",
       "geo": [0, 1, 0, 1],
-      "step_geo": [0, 0, 0, 0],
+      "height": 1
+    },
+    {
+      "id": 35,
+      "tex": "bowl.png",
+      "geo": [0, 1, 0, 1],
+      "height": 1
+    },
+    {
+      "id": 36,
+      "tex": "bridge_top_left.png",
+      "geo": [0, 0, 0, 0],
+      "height": 1
+    },
+    {
+      "id": 37,
+      "tex": "bridge_top.png",
+      "geo": [0, 0, 0, 0],
+      "height": 1
+    },
+    {
+      "id": 38,
+      "tex": "bridge_top_right.png",
+      "geo": [0, 0, 0, 0],
+      "height": 1
+    },
+    {
+      "id": 39,
+      "tex": "bridge_left.png",
+      "geo": [0, 0, 1, 1],
+      "height": 3
+    },
+    {
+      "id": 40,
+      "tex": "bridge.png",
+      "geo": [0, 0, 0, 0],
+      "height": 3
+    },
+    {
+      "id": 41,
+      "tex": "bridge_right.png",
+      "geo": [1, 1, 0, 0],
+      "height": 3
+    },
+    {
+      "id": 42,
+      "tex": "bridge_bottom_left.png",
+      "geo": [0, 0, 0, 0],
+      "height": 1
+    },
+    {
+      "id": 43,
+      "tex": "bridge_bottom.png",
+      "geo": [0, 0, 0, 0],
+      "height": 3
+    },
+    {
+      "id": 44,
+      "tex": "bridge_bottom_right.png",
+      "geo": [0, 0, 0, 0],
+      "height": 1
+    },
+    {
+      "id": 45,
+      "tex": "bridge_top_left_end.png",
+      "geo": [0, 0, 0, 1],
+      "height": 1
+    },
+    {
+      "id": 46,
+      "tex": "bridge_top_stairs.png",
+      "geo": [0, 0, 0, 0],
+      "height": 1
+    },
+    {
+      "id": 47,
+      "tex": "bridge_top_right_end.png",
+      "geo": [0, 1, 0, 0],
+      "height": 1
+    },
+    {
+      "id": 48,
+      "tex": "bridge_bottom_left_end.png",
+      "geo": [0, 0, 1, 1],
+      "height": 1
+    },
+    {
+      "id": 49,
+      "tex": "bridge_bottom_stairs.png",
+      "geo": [0, 0, 0, 0],
+      "height": 1
+    },
+    {
+      "id": 50,
+      "tex": "bridge_bottom_right_end.png",
+      "geo": [1, 1, 0, 0],
       "height": 1
     }
   ]
