@@ -35,7 +35,9 @@ def main():
                                 "copy_loading_zone", "paste_loading_zone", "extend_loading_zone", "active_loading_zone",
                                 "inactive_loading_zone", "goto_level"],
               "lights/": ["active_light", "inactive_light", "edit_light", "new_light"],
-              "height/": ["elevate", "descend", "elevate_fast", "descend_fast", "height_blank"]
+              "height/": ["elevate", "descend", "elevate_fast", "descend_fast", "height_blank"],
+              "height_zone/": ["delete_height_zone_mini", "new_height_zone", "new_height_zone_mini", "descend_mini",
+                               "elevate_mini"]
               }
     for i, j in images.items():
         for k in j:

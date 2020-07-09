@@ -112,6 +112,7 @@
       }
     }
   ],
+  "height_zones": [],
   "spawn": [0, 0],
   "world_pos": [0, 0],
   "name": "demo3"

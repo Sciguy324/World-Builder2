@@ -69,6 +69,7 @@
       }
     }
   ],
+  "height_zones": [],
   "spawn": [0, 0],
   "world_pos": [91, -135],
   "name": "demo_house"

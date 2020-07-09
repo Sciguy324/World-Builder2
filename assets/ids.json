@@ -747,6 +747,18 @@
       "tex": "bridge_bottom_right_end.png",
       "geo": [1, 1, 0, 0],
       "height": 1
+    },
+    {
+      "id": 51,
+      "tex": "bridge_left_wall.png",
+      "geo": [0, 0, 1, 1],
+      "height": 1
+    },
+    {
+      "id": 52,
+      "tex": "bridge_right_wall.png",
+      "geo": [1, 1, 0, 0],
+      "height": 1
     }
   ]
 }

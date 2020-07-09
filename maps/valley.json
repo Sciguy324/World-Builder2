@@ -816,6 +816,7 @@
       }
     }
   ],
+  "height_zones": [],
   "spawn": [0, 0],
   "world_pos": [-272, 0],
   "name": "valley"

@@ -966,13 +966,12 @@ class TilemapEditorWindow(tk.Frame):
         self.button_spacing1.grid(row=0, column=5, sticky=tk.NW)
 
         # Create a lookup list of the different layers
-        self.layers = [TilemapLayer('<Key-5>'), DecomapLayer('<Key-6>'), CollisionLayer('<Key-7>'),
-                       HeightLayer('<Key-8>'), StepLayer('<Key-9>'), LoadingZoneLayer('<Key-0>'),
-                       LightLayer('<Key-minus>')]
+        self.layers = [TilemapLayer(False, '<Key-5>'), DecomapLayer(True, '<Key-6>'), CollisionLayer(True, '<Key-7>'),
+                       HeightLayer(True, '<Key-8>'), StepLayer(True, '<Key-9>'), LoadingZoneLayer(False, '<Key-0>'),
+                       LightLayer(False, '<Key-minus>')]
 
-        self.layer_id_lookup = dict((j, i) for i, j in enumerate(('tile', 'deco', 'collision', 'height', 'step'
-                                                                                                         'loading_zone',
-                                                                  'light')))
+        self.layer_id_lookup = dict((j, i) for i, j in enumerate(('tile', 'deco', 'collision', 'height', 'step',
+                                                                  'loading_zone', 'light')))
 
         # Add layer selection buttons (tile, deco, collision, height, loading, light)
         i = 0
@@ -996,6 +995,29 @@ class TilemapEditorWindow(tk.Frame):
         self.level_coords = tk.Label(self.buttons_bar, textvariable=self.level_coords_text,
                                      borderwidth=1, relief=tk.SUNKEN, padx=5, pady=5)
         self.level_coords.grid(row=0, column=i + 9, sticky=tk.W)
+
+        # Add the height adjustment buttons, but do not make them visible
+        self.selected_height = 0
+        self.selected_height_text = tk.StringVar(self, "All")
+
+        self.height_adjust_button_frame = tk.Frame(self.buttons_bar, padx=5)
+
+        self.height_label = tk.Label(self.height_adjust_button_frame, text="Height")
+        self.height_label.grid(row=0, column=1, sticky=tk.W)
+
+        self.height_down_button = tk.Button(self.height_adjust_button_frame, text="▼", command=lambda: self.change_height(-1))
+        self.height_down_button.grid(row=0, column=2, sticky=tk.W)
+
+        self.height_text = tk.Label(self.height_adjust_button_frame, textvariable=self.selected_height_text,
+                                    borderwidth=1, relief=tk.SUNKEN, padx=5, pady=5)
+        self.height_text.grid(row=0, column=3, sticky=tk.W)
+
+        self.height_up_button = tk.Button(self.height_adjust_button_frame, text="▲", command=lambda: self.change_height(1))
+        self.height_up_button.grid(row=0, column=4, sticky=tk.W)
+
+        # Hide the frame until it is needed later
+        self.height_adjust_button_frame.grid(row=0, column=i+10, sticky=tk.W)
+        self.height_adjust_button_frame.grid_remove()
 
         # Set up tool keybindings
         self.keybindings = {"<Key-1>": self.keybind_draw_mode,
@@ -1251,10 +1273,17 @@ class TilemapEditorWindow(tk.Frame):
             # Open the image
             img = Image.open(path.join(file_path, tile_name))
             img = img.crop([0, 0, 16, 16])
+            mini_img = img.resize((8, 8), Image.NORMAL)
             img = img.resize((64, 64), Image.NORMAL)
 
             # Tell the relevant layer to handle adding the image
             new_id = self.layers[self.layer_id_lookup[mode]].add_to_pane(img, 'All')
+
+            # Generate a mini-version
+            if mode == "tile":
+                TilemapLayer.mini_img_dict[new_id] = mini_img
+            elif mode == "deco":
+                DecomapLayer.mini_img_dict[new_id] = mini_img
 
             # Ensure the project.json record is up to date
             TilemapEditorWindow.ids_data[f'{mode}_ids'][new_id] = {"tex": tile_name, "geo": [0, 0, 0, 0]}
@@ -1347,6 +1376,19 @@ class TilemapEditorWindow(tk.Frame):
             self.border_mode.set(1)
         else:
             self.border_mode.set(0)
+
+    def change_height(self, value):
+        """Change the selected height and pass the information along to the views"""
+        self.selected_height = max(self.selected_height + value, 0)
+
+        # A selected height of '0' indicates 'render all'
+        if self.selected_height == 0:
+            self.selected_height_text.set("All")
+        else:
+            self.selected_height_text.set(str(self.selected_height))
+
+        for i in self.view_list:
+            i.set_height(self.selected_height)
 
     @property
     def visible_pane(self):
@@ -1514,6 +1556,11 @@ class TilemapEditorWindow(tk.Frame):
             Zy29k8QM4CAwl9DUxwGLGBcMjk67Zx\nTVcWCYZTUUggYEkCADs=
             '''
 
+        new_height_zone = '''R0lGODlhEAAQAKEDAAAAAOzkAP//ZmPiYyH5BAEKAAMALAAAAAA
+            QABAAAAI/TDaGmocP44KgyuUG\nCODOuoGeZghGFzkgZ4EVQ6KaQHeZiGznmBtc9nDpf
+            sAZzbQrDn2cy9K3kQhdPoy1gSgAADs=
+            '''
+
         new_light = '''R0lGODlhEAAQAMIEAAAAAFVVVaqqquzkAADhAADhAADhAADhACH5BAEKA
             AQALAAAAAAQABAAAAM0\nOEOk7G2xSeuzCk7dqNxgd1ldNorjp35o27IsKcUxAShAxdl
             Aj1WAgCBHAhI9RRlkOZMkAAA7
@@ -1544,6 +1591,7 @@ class TilemapEditorWindow(tk.Frame):
                     "paste": tk.PhotoImage("img_paste", data=paste_zone).zoom(64).subsample(16),
                     "extend_zone": tk.PhotoImage("img_paste_zone", data=extend_zone).zoom(64).subsample(16),
                     "goto_level": tk.PhotoImage("img_goto_level", data=goto_level).zoom(64).subsample(16),
+                    "new_height_zone": tk.PhotoImage("img_new_step", data=new_height_zone).zoom(64).subsample(16),
                     "new_light": tk.PhotoImage("img_new_light", data=new_light).zoom(64).subsample(16),
                     "edit_light": tk.PhotoImage("img_edit_light", data=edit_light).zoom(64).subsample(16)
                     }
@@ -1567,10 +1615,12 @@ class TilemapEditorWindow(tk.Frame):
                                      6: cls.imgs["goto_level"]
                                      }
 
-        StepLayer.img_dict = {0: cls.imgs["elevate"],
-                              1: cls.imgs["elevate_fast"],
-                              2: cls.imgs["descend"],
-                              3: cls.imgs["descend_fast"]
+        StepLayer.img_dict = {0: cls.imgs["delete"],
+                              1: cls.imgs["new_height_zone"],
+                              2: cls.imgs["elevate"],
+                              3: cls.imgs["elevate_fast"],
+                              4: cls.imgs["descend"],
+                              5: cls.imgs["descend_fast"]
                               }
 
         LightLayer.img_dict = {0: cls.imgs["delete"],
@@ -1636,11 +1686,12 @@ class TilemapEditingLayer:
     icon = None
     __initialized = False
 
-    def __init__(self, keybinding=None):
+    def __init__(self, show_height_buttons=False, keybinding=None):
         # Ensure layer is initialized
         if not type(self).__initialized:
             type(self)._initialize()
         self.panes = {}
+        self.show_height_buttons = show_height_buttons
         self.keybinding = keybinding
         self.render = False
 
@@ -1797,8 +1848,13 @@ class DecomapLayer(TilemapEditingLayer):
 
     def draw_full(self, view, update_minimap=False):
         """Draw the current level's decomap"""
+        # Draw decos at the selected height
+        selected_z = view.selected_height
+
         view.level.decomap.sort()
         for deco in view.level.decomap:
+            if selected_z and deco.height != selected_z:
+                continue
             if deco.deco_id != 0:
                 view.canvas.create_image((deco.x * 64 + 32, deco.y * 64 + 32),
                                          image=DecomapLayer.img_dict[deco.deco_id])
@@ -1811,6 +1867,7 @@ class DecomapLayer(TilemapEditingLayer):
 
     def draw_individual(self, view, tile_x, tile_y, limited=False):
         current_tile = view.master.master.visible_pane.selected_id.get()
+        selected_z = view.selected_height
 
         # Draw the tile
         view.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
@@ -1819,8 +1876,11 @@ class DecomapLayer(TilemapEditingLayer):
         if int(current_tile) == 0:
             view.level.decomap.remove(tile_x, tile_y)
         else:
-            view.level.decomap.add(int(current_tile), tile_x, tile_y,
-                                   TilemapEditorWindow.ids_data["deco_ids"][current_tile]["height"])
+            if not selected_z:
+                view.level.decomap.add(int(current_tile), tile_x, tile_y,
+                                       TilemapEditorWindow.ids_data["deco_ids"][current_tile]["height"])
+            else:
+                view.level.decomap.add(int(current_tile), tile_x, tile_y, selected_z)
 
     @property
     def pane_options(self):
@@ -1835,6 +1895,7 @@ class DecomapLayer(TilemapEditingLayer):
                                                            ''')
 
 
+# TODO: Make collision layer respond to selected height
 class CollisionLayer(TilemapEditingLayer):
     img_dict = {}
     icon = None
@@ -1887,6 +1948,7 @@ class CollisionLayer(TilemapEditingLayer):
         """Modify the global collision data and draw a collision indicator to the view"""
         # Determine the id of the selected tile
         solid_state = view.master.master.visible_pane.selected_id.get()
+        selected_z = view.selected_height
 
         # Draw the collider
         view.canvas.create_rectangle((tile_x * 32, tile_y * 32, tile_x * 32 + 32, tile_y * 32 + 32),
@@ -1906,12 +1968,23 @@ class CollisionLayer(TilemapEditingLayer):
             sub_x = round(tile_x / 2 - tile_x // 2 + 0.1)
             sub_y = round(tile_y / 2 - tile_y // 2 + 0.1)
             # Grab tile ID and layer
+            target_id = -1
             if view.level.decomap[tile_x // 2, tile_y // 2]:
-                target_id = view.level.decomap[tile_x // 2, tile_y // 2][-1][0]
+                if selected_z:
+                    for deco in view.level.decomap[tile_x // 2, tile_y // 2]:
+                        if selected_z == deco.height:
+                            target_id = deco.deco_id
+                            break
+                else:
+                    target_id = view.level.decomap[tile_x // 2, tile_y // 2][-1].deco_id
                 target_set = "deco_ids"
             else:
                 target_id = view.level.tilemap[tile_y // 2][tile_x // 2]
                 target_set = "tile_ids"
+
+            # Catch unknown error
+            if target_id == -1:
+                raise Exception("Somehow, someway, the target id ended up as -1")
 
             # Modify tile's geometry
             TilemapEditorWindow.ids_data[target_set][target_id]["geo"][2*sub_x+sub_y] = solid_state
@@ -1944,7 +2017,10 @@ class HeightLayer(TilemapEditingLayer):
 
     def draw_full(self, view):
         """Draw the height map to the view"""
+        selected_z = view.selected_height
         for i in view.level.decomap:
+            if selected_z and selected_z != i.height:
+                continue
             if i.deco_id != 0:
                 # self.canvas.create_image((x * 64 + 32, y * 64 + 32), image=TilemapEditorWindow.imgs["height_blank"])
                 view.canvas.create_rectangle((i.x * 64, i.y * 64, i.x * 64 + 64, i.y * 64 + 64),
@@ -1970,6 +2046,7 @@ class HeightLayer(TilemapEditingLayer):
     @staticmethod
     def common_draw(view, tile_x, tile_y, function, limited=False):
         # Determine the id of the selected tile
+        selected_z = view.selected_height
         height_option = view.master.master.visible_pane.selected_id.get()
 
         # Draw the tile
@@ -1982,6 +2059,8 @@ class HeightLayer(TilemapEditingLayer):
         # Check if there was actually a deco at the selected location
         if decos is not None:
             for i in decos:
+                if selected_z and selected_z != i.height:
+                    continue
                 function(i, height_option)
 
     @staticmethod
@@ -2008,18 +2087,25 @@ class HeightLayer(TilemapEditingLayer):
 
 class StepLayer(TilemapEditingLayer):
     img_dict = {}
+    special_imgs = {}
     icon = None
 
     def enable(self, view):
         view.canvas.bind("<ButtonRelease-1>", lambda event: view.redraw_view())
+        view.canvas.bind("<B1-Motion>", lambda event: view.generic_start_draw(event, self.draw_individual,
+                                                                              scale=32,
+                                                                              limited=True,
+                                                                              update_save=True))
         view.canvas.bind("<ButtonPress-1>", lambda event: view.generic_start_draw(event, self.draw_individual,
                                                                                   scale=32,
-                                                                                  update_save=False))
+                                                                                  update_save=True))
         view.canvas.bind("<ButtonRelease-2>", lambda event: view.draw_line_finish(event, self.draw_individual,
                                                                                   scale=32))
 
     def draw_full(self, view):
         """Draw the entire step layer to the view"""
+        selected_z = view.selected_height
+
         # Draw the mini-grid
         for i in range(view.level.level_width * 2 + 1):
             view.canvas.create_line(32 * i, 0, 32 * i, 64 * view.level.level_height, fill="BLACK", width=1.0)
@@ -2027,55 +2113,48 @@ class StepLayer(TilemapEditingLayer):
             view.canvas.create_line(0, 32 * i, 64 * view.level.level_width, 32 * i, fill="BLACK", width=1.0)
 
         # Draw the step
-        for deco in view.level.decomap:
-            deco_id, x, y = deco.deco_id, deco.x, deco.y
-            if deco_id != 0:
-                for i, j in enumerate(TilemapEditorWindow.ids_data["deco_ids"][deco_id]["step_geo"]):
-                    sub_x = i // 2 * 32
-                    sub_y = i % 2 * 32
-                    view.canvas.create_rectangle((x * 64 + sub_x, y * 64 + sub_y,
-                                                  x * 64 + 32 + sub_x, y * 64 + 32 + sub_y),
-                                                 fill=("blue1", "red")[int(j <= 0)],
-                                                 outline=("blue1", "red")[int(j <= 0)],
-                                                 width=2,
-                                                 stipple="gray25")
+        for (x, y, z), zone in view.level.height_zones.items():
+            if 0 < selected_z != z:
+                continue
+            target_height = zone.target_height
+            view.canvas.create_rectangle((x * 32, y * 32, x * 32 + 32, y * 32 + 32),
+                                         fill=("deep sky blue", "red")[int(target_height <= 0)],
+                                         outline=("deep sky blue", "red")[int(target_height <= 0)],
+                                         width=2,
+                                         stipple="gray25")
 
-                    text = str(j) if j > 0 else ""
+            text = str(target_height) if target_height > 0 else ""
 
-                    view.canvas.create_text((x * 64 + 16 + sub_x, y * 64 + 16 + sub_y),
-                                            fill="yellow", font="Courier 12 bold", text=text)
+            view.canvas.create_text((x * 32 + 16, y * 32 + 16), fill="red", font="Courier 18 bold", text=text)
 
     def draw_individual(self, view, tile_x, tile_y, limited=False):
         """Draw an individual step"""
         # Determine the id of the selected tile
+        print(view.level.height_zones.data)
         selected_state = view.master.master.visible_pane.selected_id.get()
+        selected_z = view.selected_height
 
-        # Draw the indicator
-        color = ('green', 'green1', 'red', 'Dark Red')[selected_state]
-        view.canvas.create_rectangle((tile_x * 32, tile_y * 32, tile_x * 32 + 32, tile_y * 32 + 32),
-                                     fill=color,
-                                     width=1,
-                                     stipple="gray50")
-
-        try:
-            # [ 0, 2 ] -> [0, 1, 2, 3]
-            # [ 1, 3 ]
-            # Determine which geometry sub-tile to modify
-            sub_x = round(tile_x / 2 - tile_x // 2 + 0.1)
-            sub_y = round(tile_y / 2 - tile_y // 2 + 0.1)
-
-            # Only proceed if a deco exists where the user clicked
-            if view.level.decomap[tile_x // 2, tile_y // 2]:
-                # Get the ID of the top-level deco
-                target_id = view.level.decomap[tile_x // 2, tile_y // 2][-1][0]
-
-                # Modify deco's step geometry
-                TilemapEditorWindow.ids_data["deco_ids"][target_id]["step_geo"][sub_x * 2 + sub_y]\
-                    += (1, 5, -1, -5)[selected_state]
-                if TilemapEditorWindow.ids_data["deco_ids"][target_id]["step_geo"][sub_x * 2 + sub_y] < 0:
-                    TilemapEditorWindow.ids_data["deco_ids"][target_id]["step_geo"][sub_x * 2 + sub_y] = 0
-        except IndexError:
-            pass
+        # Delete the zone
+        if selected_state == 0:
+            view.canvas.create_image(tile_x * 32 + 16, tile_y * 32 + 16,
+                                     image=StepLayer.special_imgs["mini_delete"])
+            if (tile_x, tile_y, selected_z) in view.level.height_zones:
+                view.level.height_zones.pop((tile_x, tile_y, selected_z))
+        # New zone
+        elif selected_state == 1:
+            if (tile_x, tile_y, selected_z) not in view.level.height_zones:
+                view.canvas.create_image(tile_x * 32 + 16, tile_y * 32 + 16,
+                                         image=StepLayer.special_imgs["mini_new_zone"])
+                view.level.height_zones[tile_x, tile_y, selected_z] = HeightZone(0)
+        # Adjust target height
+        elif selected_state > 1:
+            if limited:
+                return
+            if (tile_x, tile_y, selected_z) in view.level.height_zones:
+                view.canvas.create_image(tile_x * 32 + 16, tile_y * 32 + 16,
+                                         image=StepLayer.special_imgs[("mini_elevate", "mini_elevate", "mini_descend",
+                                                                       "mini_descend")[selected_state-2]])
+                view.level.height_zones[tile_x, tile_y, selected_z].target_height += (1, 5, -1, -5)[selected_state - 2]
 
     @classmethod
     def _initialize(cls):
@@ -2084,6 +2163,28 @@ class StepLayer(TilemapEditingLayer):
                                                            lf8RUUJlVL3JGpeZKi0s9Qp7tikZEtsekVdcPTMVkM\nPu / MauesrfzB3a
                                                            P5morP6 / f8SgEAOw ==
                                                            ''')
+
+        cls.special_imgs = {"mini_delete": tk.PhotoImage("img_delete_step_mini", data='''R0lGODlhCAAIAKEDAAAAAP8AAP9UV
+                                                                                         GPiYyH5BAEKAAMALAAAAAAIAAgAAA
+                                                                                         ITBIZjEKf9DERATBou\nk2fjlShAA
+                                                                                         QA7
+                                                                                         ''').zoom(32).subsample(8),
+                            "mini_new_zone": tk.PhotoImage("img_new_step_mini", data='''R0lGODlhCAAIAKEDAAAAAOzkAP//Zm
+                                                                                        PiYyH5BAEKAAMALAAAAAAIAAgAAAIV
+                                                                                        HD5pEJgs2plSCLBO\naM9ubGzfMx0F
+                                                                                        ADs=
+                                                                                        ''').zoom(32).subsample(8),
+                            "mini_elevate": tk.PhotoImage("img_elevate_step_mini", data='''R0lGODlhCAAIAKEBAADVAGPiY2P
+                                                                                           iY2PiYyH5BAEKAAIALAAAAAAIAA
+                                                                                           gAAAIPlI8SkQtw3IPnJWFT\nvqc
+                                                                                           AADs=
+                                                                                           ''').zoom(32).subsample(8),
+                            "mini_descend": tk.PhotoImage("img_descend_step_mini", data='''R0lGODlhCAAIAKECAKYAAMUAAGP
+                                                                                           iY2PiYyH5BAEKAAIALAAAAAAIAA
+                                                                                           gAAAIPlI8Skcq50AqgHmpR\nbqc
+                                                                                           AADs=
+                                                                                           ''').zoom(32).subsample(8),
+                            }
 
 
 class LoadingZoneLayer(TilemapEditingLayer):
@@ -2099,12 +2200,12 @@ class LoadingZoneLayer(TilemapEditingLayer):
 
     def draw_full(self, view):
         """Draw the loading zones to the view"""
-        for i, j in view.level.loading_zones.items():
-            if j.target_level == "":
-                view.canvas.create_image((i[0] * 64 + 32, i[1] * 64 + 32),
+        for (x, y), zone in view.level.loading_zones.items():
+            if zone.target_level == "":
+                view.canvas.create_image((x * 64 + 32, y * 64 + 32),
                                          image=LoadingZoneLayer.special_imgs["inactive_zone"])
             else:
-                view.canvas.create_image((i[0] * 64 + 32, i[1] * 64 + 32),
+                view.canvas.create_image((x * 64 + 32, y * 64 + 32),
                                          image=LoadingZoneLayer.special_imgs["active_zone"])
 
     def draw_individual(self, view, tile_x, tile_y, limited=False):
@@ -2123,7 +2224,7 @@ class LoadingZoneLayer(TilemapEditingLayer):
             if (tile_x, tile_y) not in view.level.loading_zones:
                 view.canvas.create_image(tile_x * 64 + 32, tile_y * 64 + 32,
                                          image=LoadingZoneLayer.special_imgs["inactive_zone"])
-                view.level.loading_zones[tile_x, tile_y] = LoadingZone("", [0, 0, 0])
+                view.level.loading_zones[tile_x, tile_y] = LoadingZone("", [0, 0, 1])
 
         elif mode == 2:
             # Edit an existing zone, but only if in safe mode
@@ -2316,6 +2417,7 @@ class TilemapView(tk.Frame):
         self.copied_zone = None
         self.copied_zone_coords = None
         self.copied_light = None
+        self.selected_height = 0
 
         # Declare the tilemap data
         self.level = Level()
@@ -2462,6 +2564,11 @@ class TilemapView(tk.Frame):
             self.canvas.bind("<B1-Motion>", self.move)
             self.canvas.config(cursor="fleur")
 
+    def set_height(self, value):
+        """Set which heights are being rendered on the screen"""
+        self.selected_height = value
+        self.redraw_view()
+
     def generic_start_draw(self, event, draw_function, limited=False, scale=64, update_save=True):
         self.backup_state()
         self.generic_draw(event, draw_function, limited, scale, update_save)
@@ -2510,6 +2617,11 @@ class TilemapView(tk.Frame):
     def set_layer(self):
         """Update the layer visibility status"""
         self.set_mode(self.master.master.tool_mode.get())
+        # Show the height selection buttons, if applicable
+        if self.master.master.layers[self.master.master.layer.get()].show_height_buttons:
+            self.master.master.height_adjust_button_frame.grid()
+        else:
+            self.master.master.height_adjust_button_frame.grid_remove()
         self.redraw_view()
 
     def event_to_tile(self, event, scale: int = 64, return_type: type = int):
@@ -2610,16 +2722,23 @@ class TilemapView(tk.Frame):
             for k, m in enumerate(j):
                 self.level.collider[i][k] = 0
 
+        # Obtain selected height
+        selected_z = self.selected_height
+
         # Apply tile geometry
-        for y, i in enumerate(self.level.tilemap):
-            for x, _id in enumerate(i):
-                self.level.collider[y * 2][x * 2] = TilemapEditorWindow.ids_data["tile_ids"][_id]["geo"][0]
-                self.level.collider[y * 2 + 1][x * 2] = TilemapEditorWindow.ids_data["tile_ids"][_id]["geo"][1]
-                self.level.collider[y * 2][x * 2 + 1] = TilemapEditorWindow.ids_data["tile_ids"][_id]["geo"][2]
-                self.level.collider[y * 2 + 1][x * 2 + 1] = TilemapEditorWindow.ids_data["tile_ids"][_id]["geo"][3]
+        if not selected_z:
+            for y, i in enumerate(self.level.tilemap):
+                for x, _id in enumerate(i):
+                    self.level.collider[y * 2][x * 2] = TilemapEditorWindow.ids_data["tile_ids"][_id]["geo"][0]
+                    self.level.collider[y * 2 + 1][x * 2] = TilemapEditorWindow.ids_data["tile_ids"][_id]["geo"][1]
+                    self.level.collider[y * 2][x * 2 + 1] = TilemapEditorWindow.ids_data["tile_ids"][_id]["geo"][2]
+                    self.level.collider[y * 2 + 1][x * 2 + 1] = TilemapEditorWindow.ids_data["tile_ids"][_id]["geo"][3]
 
         # Apply deco geometry
         for deco in self.level.decomap:
+            if selected_z and selected_z != deco.height:
+                continue
+
             deco_id, x, y = deco.deco_id, deco.x, deco.y
             self.level.collider[y * 2][x * 2] ^= TilemapEditorWindow.ids_data["deco_ids"][deco_id]["geo"][0]
             self.level.collider[y * 2 + 1][x * 2] ^= TilemapEditorWindow.ids_data["deco_ids"][deco_id]["geo"][1]
@@ -2830,7 +2949,7 @@ class Level:
                 blue = ColorFade(i["blue"]["amplitude"], i["blue"]["inner_diameter"], i["blue"]["outer_diameter"])
                 self.lightmap[i["pos"][0], i["pos"][1]] = Light(i["diameter"], red, green, blue, i["blacklight"], True)
             for i in data["height_zones"]:
-                self.height_zones[i["zone"][0], i["zone"][1]] = HeightZone(i["height"], i["target_height"])
+                self.height_zones[i["zone"][0], i["zone"][1], i["zone"][2]] = HeightZone(i["target_height"])
             self.default_start = data["spawn"]
             self.name = data["name"]
             if self.name in App.project_data["levels"]:
@@ -2862,6 +2981,7 @@ class Level:
         result.default_start = self.default_start.copy()
         result.lightmap = self.lightmap.copy()
         result.loading_zones = self.loading_zones.copy()
+        result.height_zones = self.height_zones.copy()
         return result
 
     def change_size(self, left=0, right=0, up=0, down=0):
@@ -2948,6 +3068,7 @@ class Level:
                              # "colliders": self.collider,
                              "loading_zones": self.loading_zones.jsonify(),
                              "lightmap": self.lightmap.jsonify(),
+                             "height_zones": self.height_zones.jsonify(),
                              "spawn": self.default_start,
                              "world_pos": self.world_pos,
                              "name": self.name}, indent=2)
@@ -2982,7 +3103,7 @@ class Decomap:
 
     def __getitem__(self, key):
         """Get a list of all entries with the given coordinates"""
-        if len(key) == 2 and type(key[0]) == int and type(key[1]) == int:
+        if len(key) == 2 and all(type(i) == int for i in key):
             result = [i for i in self.values if i.x == key[0] and i.y == key[1]]
             if len(result) == 0:
                 return None
@@ -3064,12 +3185,11 @@ class LoadingZone:
 @dataclass
 class HeightZone:
     """Data structure for loading zones"""
-    height: int
     target_height: int
 
     def copy(self):
         """Return a copy of the loading zone"""
-        return HeightZone(self.height, self.target_height)
+        return HeightZone(self.target_height)
 
 
 @dataclass
@@ -3137,7 +3257,10 @@ class CoordinateDict:
 
     def __contains__(self, key):
         """Check if the dictionary contains a loading zones with 'key'"""
-        return key in self.data
+        if self.check_key(key):
+            return key in self.data
+        else:
+            raise TypeError("'{}' is not a valid key!".format(key))
 
     @staticmethod
     def check_key(key):
@@ -3195,6 +3318,11 @@ class HeightZoneDict(CoordinateDict):
     # [{"zone":[x, y], "height": height, "target_height": target_height}]
 
     @staticmethod
+    def check_key(key):
+        """Check the type of a key to make sure it is compatible.  Override in subclass"""
+        return type(key) == tuple and len(key) == 3 and all(type(i) == int for i in key)
+
+    @staticmethod
     def check_type(value):
         """Check to make sure the value type is a HeightZone"""
         return type(value) == HeightZone
@@ -3210,7 +3338,6 @@ class HeightZoneDict(CoordinateDict):
         result = []
         for i, j in self.data.items():
             result.append({"zone": list(i),
-                           "height": j.height,
                            "target_height": j.target_height})
         return result
 
