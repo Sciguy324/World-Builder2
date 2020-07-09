@@ -706,7 +706,6 @@ class GroupEditorGroup(tk.Frame):
 
 
 # TODO: Refactor ids list
-# TODO: Make it so editor only compiles minimaps if a level is in project.json
 # TODO: Consider merging height zones and loading zones
 
 class CustomButton(ttk.Button):
@@ -1895,7 +1894,6 @@ class DecomapLayer(TilemapEditingLayer):
                                                            ''')
 
 
-# TODO: Make collision layer respond to selected height
 class CollisionLayer(TilemapEditingLayer):
     img_dict = {}
     icon = None
@@ -1968,23 +1966,26 @@ class CollisionLayer(TilemapEditingLayer):
             sub_x = round(tile_x / 2 - tile_x // 2 + 0.1)
             sub_y = round(tile_y / 2 - tile_y // 2 + 0.1)
             # Grab tile ID and layer
-            target_id = -1
+            target_id = None
+            target_set = None
+            deco_found = False
             if view.level.decomap[tile_x // 2, tile_y // 2]:
                 if selected_z:
                     for deco in view.level.decomap[tile_x // 2, tile_y // 2]:
                         if selected_z == deco.height:
                             target_id = deco.deco_id
+                            deco_found = True
                             break
                 else:
                     target_id = view.level.decomap[tile_x // 2, tile_y // 2][-1].deco_id
                 target_set = "deco_ids"
-            else:
+            if not deco_found and selected_z <= 1:
                 target_id = view.level.tilemap[tile_y // 2][tile_x // 2]
                 target_set = "tile_ids"
 
-            # Catch unknown error
-            if target_id == -1:
-                raise Exception("Somehow, someway, the target id ended up as -1")
+            if target_id is None or target_set is None:
+                print(target_id, target_set)
+                return
 
             # Modify tile's geometry
             TilemapEditorWindow.ids_data[target_set][target_id]["geo"][2*sub_x+sub_y] = solid_state
@@ -2008,7 +2009,7 @@ class HeightLayer(TilemapEditingLayer):
     def enable(self, view):
         view.canvas.bind("<ButtonRelease-1>", lambda event: view.redraw_view())
         view.canvas.bind("<ButtonPress-1>", lambda event: view.generic_start_draw(event, self.modify_selected,
-                                                                                  update_save=False))
+                                                                                  update_save=True))
         view.canvas.bind("<Shift-ButtonPress-1>", lambda event: view.generic_start_draw(event, self.modify_default,
                                                                                         update_save=False))
         view.canvas.bind("<Control-ButtonPress-1>", lambda event: view.generic_start_draw(event, self.reset_selected,
@@ -2130,7 +2131,6 @@ class StepLayer(TilemapEditingLayer):
     def draw_individual(self, view, tile_x, tile_y, limited=False):
         """Draw an individual step"""
         # Determine the id of the selected tile
-        print(view.level.height_zones.data)
         selected_state = view.master.master.visible_pane.selected_id.get()
         selected_z = view.selected_height
 
@@ -2726,7 +2726,7 @@ class TilemapView(tk.Frame):
         selected_z = self.selected_height
 
         # Apply tile geometry
-        if not selected_z:
+        if selected_z <= 1:
             for y, i in enumerate(self.level.tilemap):
                 for x, _id in enumerate(i):
                     self.level.collider[y * 2][x * 2] = TilemapEditorWindow.ids_data["tile_ids"][_id]["geo"][0]
@@ -2820,24 +2820,25 @@ class TilemapView(tk.Frame):
             file = path.join("maps", file)
             self.file_path = file
 
+        # Only apply this part of the level is in project.json
         if self.level.name in App.project_data["levels"]:
+            # Save relative path to project.json
             relative_path = file.replace((getcwd() + '/').replace('\\', '/'), '')
             App.project_data["levels"][self.level.name]["path"] = relative_path
+
+            # Save a screenshot of the entire file
+            self.redraw_view(True)
+            self.image_view.save(f'mini/{self.level.name}.png')
+
+            # Also save the screenshot to the WorldEditorWindow
+            del WorldEditorWindow.mini_maps[self.level.name]
+            WorldEditorWindow.mini_maps[self.level.name] = ImageTk.PhotoImage(self.image_view)
 
         # Write json tag to file
         with open(file, mode="w") as f:
             f.write(self.level.jsonify())
         self.saved = True
         self.update_title()
-
-        # Save a screenshot of the entire file
-        self.redraw_view(True)
-        self.image_view.save(f'mini/{self.level.name}.png')
-
-        # Also save the screenshot to the WorldEditorWindow
-        if not self.level.ignore_from_project:
-            del WorldEditorWindow.mini_maps[self.level.name]
-            WorldEditorWindow.mini_maps[self.level.name] = ImageTk.PhotoImage(self.image_view)
 
     def backup_state(self):
         """Save a backup of the current level state"""
@@ -3093,8 +3094,7 @@ class Deco:
 class Decomap:
     """Container structure for decomap data"""
 
-    # Data structure: [[id, x, y],...]
-    # TODO: Make this structure more consistent, perhaps by making elements their own data type
+    # Data structure: [Deco(id, x, y, height),...]
     def __init__(self):
         self.values = []
 
