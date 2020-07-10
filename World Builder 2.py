@@ -2008,7 +2008,7 @@ class HeightLayer(TilemapEditingLayer):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.render_mode = 0
+        self.render_mode = False
 
     def enable(self, view):
         view.canvas.bind("<ButtonRelease-1>", lambda event: view.redraw_view())
@@ -2018,12 +2018,13 @@ class HeightLayer(TilemapEditingLayer):
                                                                                         update_save=False))
         view.canvas.bind("<Control-ButtonPress-1>", lambda event: view.generic_start_draw(event, self.reset_selected,
                                                                                           update_save=False))
-        view.canvas.bind("<ButtonRelease-2>", lambda event: view.draw_line_finish(event, self.modify_selected))
+        view.canvas.bind("<ButtonRelease-2>", lambda event: view.draw_line_finish(event, self.modify_selected,
+                                                                                  scale=32))
         view.canvas.bind("<ButtonPress-3>", lambda event, x=view: self.toggle_render_order_mode(x))
 
     def toggle_render_order_mode(self, view):
         """Toggle whether the user is viewing just the height or the rendering order (height+y+render_offset)"""
-        self.render_mode = int(not self.render_mode)
+        self.render_mode = not self.render_mode
         view.redraw_view()
 
     def draw_full(self, view):
@@ -2047,9 +2048,9 @@ class HeightLayer(TilemapEditingLayer):
 
     def modify_selected(self, view, tile_x, tile_y, limited=False):
         """Modify the height of the selected tile"""
-        if self.render_mode == 0:
+        if not self.render_mode:
             self.common_draw(view, tile_x, tile_y, self._modify_selected, limited)
-        elif self.render_mode == 1:
+        else:
             self.common_draw(view, tile_x, tile_y, self._modify_render_offset, limited)
 
     def modify_default(self, view, tile_x, tile_y, limited=False):
@@ -2111,6 +2112,10 @@ class StepLayer(TilemapEditingLayer):
     special_imgs = {}
     icon = None
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.render_mode = False
+
     def enable(self, view):
         view.canvas.bind("<ButtonRelease-1>", lambda event: view.redraw_view())
         view.canvas.bind("<B1-Motion>", lambda event: view.generic_start_draw(event, self.draw_individual,
@@ -2121,11 +2126,19 @@ class StepLayer(TilemapEditingLayer):
                                                                                   scale=32,
                                                                                   update_save=True))
         view.canvas.bind("<ButtonRelease-2>", lambda event: view.draw_line_finish(event, self.draw_individual,
-                                                                                  scale=32))
+                                                                                  scale=32, limited=False))
+        view.canvas.bind("<ButtonPress-3>", lambda event, x=view: self.toggle_render_order_mode(x))
+
+    def toggle_render_order_mode(self, view):
+        """Toggle whether the user is viewing just the height or the rendering order (height+y+render_offset)"""
+        self.render_mode = not self.render_mode
+        view.redraw_view()
 
     def draw_full(self, view):
         """Draw the entire step layer to the view"""
         selected_z = view.selected_height
+        color, text_color = ((("deep sky blue", "red"), "red"),
+                             (("green2", "green2"), "black"))[self.render_mode]
 
         # Draw the mini-grid
         for i in range(view.level.level_width * 2 + 1):
@@ -2139,42 +2152,55 @@ class StepLayer(TilemapEditingLayer):
                 continue
             target_height = zone.target_height
             view.canvas.create_rectangle((x * 32, y * 32, x * 32 + 32, y * 32 + 32),
-                                         fill=("deep sky blue", "red")[int(target_height <= 0)],
-                                         outline=("deep sky blue", "red")[int(target_height <= 0)],
+                                         fill=color[int(target_height <= 0)],
+                                         outline=color[int(target_height <= 0)],
                                          width=2,
                                          stipple="gray25")
 
-            text = str(target_height) if target_height > 0 else ""
+            if not self.render_mode:
+                text = str(target_height) if target_height > 0 else ""
+            else:
+                text = str(target_height + zone.target_render_offset)
 
-            view.canvas.create_text((x * 32 + 16, y * 32 + 16), fill="red", font="Courier 18 bold", text=text)
+            view.canvas.create_text((x * 32 + 16, y * 32 + 16), fill=text_color, font="Courier 18 bold", text=text)
 
     def draw_individual(self, view, tile_x, tile_y, limited=False):
         """Draw an individual step"""
         # Determine the id of the selected tile
         selected_state = view.master.master.visible_pane.selected_id.get()
-        selected_z = view.selected_height
+        z = view.selected_height
+
+        # If the current visible height is "All," apply changes to the topmost height zone
+        if z == 0:
+            top_z = view.level.height_zones.get_top_zone(tile_x, tile_y)
+            if top_z:
+                z = top_z
+            del top_z
 
         # Delete the zone
         if selected_state == 0:
             view.canvas.create_image(tile_x * 32 + 16, tile_y * 32 + 16,
                                      image=StepLayer.special_imgs["mini_delete"])
-            if (tile_x, tile_y, selected_z) in view.level.height_zones:
-                view.level.height_zones.pop((tile_x, tile_y, selected_z))
+            if (tile_x, tile_y, z) in view.level.height_zones:
+                view.level.height_zones.pop((tile_x, tile_y, z))
         # New zone
         elif selected_state == 1:
-            if (tile_x, tile_y, selected_z) not in view.level.height_zones:
+            if (tile_x, tile_y, z) not in view.level.height_zones:
                 view.canvas.create_image(tile_x * 32 + 16, tile_y * 32 + 16,
                                          image=StepLayer.special_imgs["mini_new_zone"])
-                view.level.height_zones[tile_x, tile_y, selected_z] = HeightZone(0)
+                view.level.height_zones[tile_x, tile_y, z] = HeightZone(0, 0)
         # Adjust target height
         elif selected_state > 1:
             if limited:
                 return
-            if (tile_x, tile_y, selected_z) in view.level.height_zones:
+            if (tile_x, tile_y, z) in view.level.height_zones:
                 view.canvas.create_image(tile_x * 32 + 16, tile_y * 32 + 16,
                                          image=StepLayer.special_imgs[("mini_elevate", "mini_elevate", "mini_descend",
                                                                        "mini_descend")[selected_state-2]])
-                view.level.height_zones[tile_x, tile_y, selected_z].target_height += (1, 5, -1, -5)[selected_state - 2]
+                if not self.render_mode:
+                    view.level.height_zones[tile_x, tile_y, z].target_height += (1, 5, -1, -5)[selected_state-2]
+                else:
+                    view.level.height_zones[tile_x, tile_y, z].target_render_offset += (1, 5, -1, -5)[selected_state-2]
 
     @classmethod
     def _initialize(cls):
@@ -2696,7 +2722,7 @@ class TilemapView(tk.Frame):
         self.canvas.create_line(self.line_start_x, self.line_start_y, x2, y2,
                                 capstyle=tk.ROUND, fill="blue", stipple="gray50", tag="draw_line", width=10)
 
-    def draw_line_finish(self, event, function, scale=64):
+    def draw_line_finish(self, event, function, scale=64, limited=False):
         """Finish drawing the line"""
         if not self.check_bounds(event):
             self.redraw_view()
@@ -2717,7 +2743,7 @@ class TilemapView(tk.Frame):
             # Only draw the image if the coordinate has not been drawn to already
             if not (try_tile_x == x and try_tile_y == y):
                 try_tile_x, try_tile_y = x, y
-                function(self, int(try_tile_x), int(try_tile_y), limited=True)
+                function(self, int(try_tile_x), int(try_tile_y), limited=limited)
 
         self.redraw_view()
         self.backup_state()
@@ -2942,6 +2968,7 @@ class Level:
 
     def load_from_json(self, data):
         """Load level data from a JSON representation"""
+        # TODO: Shift responsibility of loading components to their respective classes
         try:
             self.tilemap = data["tilemap"]
             self.level_width = len(self.tilemap[0])
@@ -2970,7 +2997,8 @@ class Level:
                 blue = ColorFade(i["blue"]["amplitude"], i["blue"]["inner_diameter"], i["blue"]["outer_diameter"])
                 self.lightmap[i["pos"][0], i["pos"][1]] = Light(i["diameter"], red, green, blue, i["blacklight"], True)
             for i in data["height_zones"]:
-                self.height_zones[i["zone"][0], i["zone"][1], i["zone"][2]] = HeightZone(i["target_height"])
+                self.height_zones[i["zone"][0], i["zone"][1], i["zone"][2]] = HeightZone(i["target_height"],
+                                                                                         i["target_render_offset"])
             self.default_start = data["spawn"]
             self.name = data["name"]
             if self.name in App.project_data["levels"]:
@@ -3209,10 +3237,11 @@ class LoadingZone:
 class HeightZone:
     """Data structure for loading zones"""
     target_height: int
+    target_render_offset: int
 
     def copy(self):
         """Return a copy of the loading zone"""
-        return HeightZone(self.target_height)
+        return HeightZone(self.target_height, self.target_render_offset)
 
 
 @dataclass
@@ -3262,7 +3291,7 @@ class CoordinateDict:
         return self.data.__repr__()
 
     def __getitem__(self, key):
-        """Obtain the loading zone given by 'key'"""
+        """Obtain the entry given by 'key'"""
         if self.check_key(key):
             return self.data[key]
         else:
@@ -3345,6 +3374,17 @@ class HeightZoneDict(CoordinateDict):
         """Check the type of a key to make sure it is compatible.  Override in subclass"""
         return type(key) == tuple and len(key) == 3 and all(type(i) == int for i in key)
 
+    def get_top_zone(self, tile_x, tile_y):
+        results = []
+        for (x, y, z), zone in self.data.items():
+            if tile_x == x and tile_y == y:
+                results.append(z)
+
+        if not results:
+            return None
+        else:
+            return results[-1]
+
     @staticmethod
     def check_type(value):
         """Check to make sure the value type is a HeightZone"""
@@ -3361,7 +3401,8 @@ class HeightZoneDict(CoordinateDict):
         result = []
         for i, j in self.data.items():
             result.append({"zone": list(i),
-                           "target_height": j.target_height})
+                           "target_height": j.target_height,
+                           "target_render_offset": j.target_render_offset})
         return result
 
 
