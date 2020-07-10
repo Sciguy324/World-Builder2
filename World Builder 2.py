@@ -2006,6 +2006,10 @@ class HeightLayer(TilemapEditingLayer):
     img_dict = {}
     icon = None
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.render_mode = 0
+
     def enable(self, view):
         view.canvas.bind("<ButtonRelease-1>", lambda event: view.redraw_view())
         view.canvas.bind("<ButtonPress-1>", lambda event: view.generic_start_draw(event, self.modify_selected,
@@ -2015,26 +2019,38 @@ class HeightLayer(TilemapEditingLayer):
         view.canvas.bind("<Control-ButtonPress-1>", lambda event: view.generic_start_draw(event, self.reset_selected,
                                                                                           update_save=False))
         view.canvas.bind("<ButtonRelease-2>", lambda event: view.draw_line_finish(event, self.modify_selected))
+        view.canvas.bind("<ButtonPress-3>", lambda event, x=view: self.toggle_render_order_mode(x))
+
+    def toggle_render_order_mode(self, view):
+        """Toggle whether the user is viewing just the height or the rendering order (height+y+render_offset)"""
+        self.render_mode = int(not self.render_mode)
+        view.redraw_view()
 
     def draw_full(self, view):
         """Draw the height map to the view"""
         selected_z = view.selected_height
+        color, text_color = (("orange", "Dark Red"), ("green2", "black"))[self.render_mode]  # One liners let's gooo!
+
         for i in view.level.decomap:
             if selected_z and selected_z != i.height:
                 continue
             if i.deco_id != 0:
                 # self.canvas.create_image((x * 64 + 32, y * 64 + 32), image=TilemapEditorWindow.imgs["height_blank"])
                 view.canvas.create_rectangle((i.x * 64, i.y * 64, i.x * 64 + 64, i.y * 64 + 64),
-                                             fill="orange",
-                                             outline="orange",
+                                             fill=color,
+                                             outline=color,
                                              width=2,
                                              stipple="gray50")
-                view.canvas.create_text((i.x * 64 + 32, i.y * 64 + 32), fill="Dark Red", font="Courier 30 bold",
-                                        text=str(i.height))
+                text = str(i.height) if not self.render_mode else str(i.height + i.y + i.render_offset)
+                view.canvas.create_text((i.x * 64 + 32, i.y * 64 + 32), fill=text_color, font="Courier 30 bold",
+                                        text=text)
 
     def modify_selected(self, view, tile_x, tile_y, limited=False):
         """Modify the height of the selected tile"""
-        self.common_draw(view, tile_x, tile_y, self._modify_selected, limited)
+        if self.render_mode == 0:
+            self.common_draw(view, tile_x, tile_y, self._modify_selected, limited)
+        elif self.render_mode == 1:
+            self.common_draw(view, tile_x, tile_y, self._modify_render_offset, limited)
 
     def modify_default(self, view, tile_x, tile_y, limited=False):
         """Modify the height of the selected tile"""
@@ -2067,6 +2083,10 @@ class HeightLayer(TilemapEditingLayer):
     @staticmethod
     def _modify_selected(deco, height_option):
         deco.height += (1, 5, -1, -5)[height_option]
+
+    @staticmethod
+    def _modify_render_offset(deco, height_option):
+        deco.render_offset += (1, 5, -1, -5)[height_option]
 
     # TODO: Add a better way to modify the default height
     @staticmethod
@@ -2546,7 +2566,7 @@ class TilemapView(tk.Frame):
         """Does the actual work of setting the window's mode"""
         # Unbind the controls
         for i in ["<ButtonRelease-1>", "<ButtonPress-1>", "<B1-Motion>", "<ButtonPress-2>", "<B2-Motion>",
-                  "<ButtonRelease-2>", "<Shift-ButtonPress-1>"]:
+                  "<ButtonRelease-2>", "<Shift-ButtonPress-1>", "<ButtonPress-3>"]:
             self.canvas.unbind(i)
 
         # Set up the control scheme
@@ -2934,11 +2954,11 @@ class Level:
             #                    self.decomap.add(m, x, y, TilemapEditorWindow.ids_data["deco_ids"][m]["height"])
 
             try:
-                for i, j, k, l in data["decomap"]:
-                    self.decomap.add(i, j, k, l)
+                for deco_id, x, y, height, render_offset in data["decomap"]:
+                    self.decomap.add(deco_id, x, y, height, render_offset)
             except ValueError:
-                for i, j, k in data["decomap"]:
-                    self.decomap.add(i, j, k, TilemapEditorWindow.ids_data["deco_ids"][i]["height"])
+                for deco_id, x, y in data["decomap"]:
+                    self.decomap.add(deco_id, x, y, TilemapEditorWindow.ids_data["deco_ids"][deco_id]["height"])
 
             self.collider = [[0] * (self.level_width * 2) for i in range(self.level_height * 2)]
             self.loading_zones = LoadingZoneDict()
@@ -3082,13 +3102,16 @@ class Level:
 
 @dataclass
 class Deco:
+    """Data structure for decos.  deco_id: id representation of the deco,  x: x-position, y: y-position, height:
+    height and render order offset, render_offset: additional render ordering offset parameter."""
     deco_id: int
     x: int
     y: int
     height: int
+    render_offset: int
 
     def copy(self):
-        return Deco(self.deco_id, self.x, self.y, self.height)
+        return Deco(self.deco_id, self.x, self.y, self.height, self.render_offset)
 
 
 class Decomap:
@@ -3136,7 +3159,7 @@ class Decomap:
         result.values = [i.copy() for i in self.values]
         return result
 
-    def add(self, deco_id, x, y, height):
+    def add(self, deco_id, x, y, height, render_offset=0):
         """Add an item to the decomap"""
         already_exists = False
         for deco in self.values:
@@ -3145,7 +3168,7 @@ class Decomap:
                 break
 
         if not already_exists:
-            self.values.append(Deco(deco_id, x, y, height))
+            self.values.append(Deco(deco_id, x, y, height, render_offset))
 
     def remove(self, x, y, deco_id=None):
         """Remove all items at the coordinates x-y from the decomap"""
@@ -3154,21 +3177,21 @@ class Decomap:
         else:
             self.values = [i for i in self.values if not (i.x == x and i.y == y)]
 
-    def set(self, x, y, deco_id, height):
+    def set(self, x, y, deco_id, height, render_offset=0):
         """Remove all entries that have the given coordinates and append a new value with a given height"""
         self.remove(x, y)
-        self.add(x, y, deco_id, height)
+        self.add(x, y, deco_id, height, render_offset)
 
     def sort(self):
-        """Sort the decomap elements in order of height+row"""
-        self.values = sorted(self.values, key=lambda x: x.height + x.y)
+        """Sort the decomap elements in order of height + row + render_offset"""
+        self.values = sorted(self.values, key=lambda x: x.height + x.y + x.render_offset)
 
     def jsonify(self):
         """Convert the decomap into json format"""
         # Ensure decomap is properly sorted
         self.sort()
         # Return a copy
-        return [[i.deco_id, i.x, i.y, i.height] for i in self.values]
+        return [[i.deco_id, i.x, i.y, i.height, i.render_offset] for i in self.values]
 
 
 @dataclass
