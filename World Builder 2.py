@@ -2160,7 +2160,7 @@ class StepLayer(TilemapEditingLayer):
             if not self.render_mode:
                 text = str(target_height) if target_height > 0 else ""
             else:
-                text = str(target_height + zone.target_render_offset)
+                text = str(target_height + zone.target_render_offset + y // 2)
 
             view.canvas.create_text((x * 32 + 16, y * 32 + 16), fill=text_color, font="Courier 18 bold", text=text)
 
