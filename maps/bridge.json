@@ -203,22 +203,22 @@
     {
       "zone": [18, 15, 1],
       "target_height": 2, 
-      "target_render_offset": 0
+      "target_render_offset": 4
     },
     {
       "zone": [19, 15, 1],
       "target_height": 2, 
-      "target_render_offset": 0
+      "target_render_offset": 4
     },
     {
       "zone": [20, 15, 1],
       "target_height": 2, 
-      "target_render_offset": 0
+      "target_render_offset": 4
     },
     {
       "zone": [21, 15, 1],
       "target_height": 2, 
-      "target_render_offset": 0
+      "target_render_offset": 4
     },
     {
       "zone": [18, 16, 2],

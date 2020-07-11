@@ -463,7 +463,7 @@ class GroupEditorDialog(Dialog):
         self.selection_frame = tk.Frame(self.content_frame)
         self.selection_frame.grid(row=0, column=0, sticky=tk.NW, padx=4)
 
-        self.selection_canvas = tk.Canvas(self.selection_frame, width=16 * 64, height=5 * 64, bg="WHITE", bd=0)
+        self.selection_canvas = tk.Canvas(self.selection_frame, width=16 * 64, height=5 * 64, bg=config.canvas_bg, bd=0)
         self.selection_canvas.grid(row=0, column=0, sticky=tk.NW, padx=4)
         self.selection_canvas.bind("<Button-1>", func=self.select_tile)
         self.selected_tile = tk.IntVar(self, 0, "group_editor_selected_tile")
@@ -612,7 +612,7 @@ class GroupEditorGroup(tk.Frame):
         self.selected_index = tk.IntVar(self, -1)
 
         # Construct the canvas
-        self.canvas = tk.Canvas(self, width=3 * 64, height=9 * 64, bg="WHITE", bd=0)
+        self.canvas = tk.Canvas(self, width=3 * 64, height=9 * 64, bg=config.canvas_bg, bd=0)
         self.canvas.grid(row=0, column=0, sticky=tk.NW, padx=4)
 
         self.scrollbar = tk.Scrollbar(self, orient=tk.VERTICAL, command=self.canvas.yview)
@@ -791,7 +791,6 @@ class CustomNotebook(ttk.Notebook):
 
         kwargs["style"] = "CustomNotebook"
         ttk.Notebook.__init__(self, *args, **kwargs)
-
         self._active = None
 
         self.bind("<ButtonPress-1>", self.on_close_press, True)
@@ -866,6 +865,61 @@ class CustomNotebook(ttk.Notebook):
                 ]
             }),
         ])
+        if config.name != "Default":
+            style.configure("CustomNotebook", background=config.bg, borderwidth=0)
+            style.configure("TNotebook", background=config.bg, borderwidth=0)
+            style.configure("TFrame", background=config.bg)
+
+
+class CustomScrollbar(ttk.Scrollbar):
+    __initialized = False
+
+    def __init__(self, *args, **kwargs):
+        if not CustomScrollbar.__initialized:
+            CustomScrollbar.__initialize_custom_style()
+            CustomScrollbar.__initialized = True
+
+        kwargs["style"] = "CustomScrollbar"
+        ttk.Scrollbar.__init__(self, *args, **kwargs)
+
+    @classmethod
+    def __initialize_custom_style(cls):
+        # Layouts adapted from:
+        # https://stackoverflow.com/questions/28375591/changing-the-appearance-of-a-scrollbar-in-tkinter-using-ttk-styles
+        style = ttk.Style()
+
+        style.element_create("Horizontal.CustomScrollbar.trough", "from", "default")
+        style.layout("Horizontal.Scrollbar",
+                     [('Horizontal.CustomScrollbar.trough', {'children':
+                                                                 [('Horizontal.CustomScrollbar.leftarrow',
+                                                                   {'side': 'left', 'sticky': ''}),
+                                                                  ('Horizontal.CustomScrollbar.rightarrow',
+                                                                   {'side': 'right', 'sticky': ''}),
+                                                                  ('Horizontal.CustomScrollbar.thumb',
+                                                                   {'unit': '1', 'children':
+                                                                       [('Horizontal.CustomScrollbar.grip',
+                                                                         {'sticky': ''})],
+                                                                    'sticky': 'nswe'})],
+                                                             'sticky': 'we'})])
+
+        # print(style.theme_names())
+        # print(style.theme_use('default'))
+        style.element_create("Vertical.CustomScrollbar.trough", "from", "default")
+        style.layout("Vertical.CustomScrollbar",
+                     [('Vertical.CustomScrollbar.trough', {'children':
+                                                               [('Vertical.CustomScrollbar.uparrow',
+                                                                 {'side': 'top', 'sticky': ''}),
+                                                                ('Vertical.CustomScrollbar.downarrow',
+                                                                 {'side': 'bottom', 'sticky': ''}),
+                                                                ('Vertical.CustomScrollbar.thumb',
+                                                                 {'unit': '1', 'children':
+                                                                     [('Vertical.CustomScrollbar.grip',
+                                                                       {'sticky': ''})],
+                                                                  'sticky': 'nswe'})],
+                                                           'sticky': 'ns'})])
+
+        # style.configure("Vertical.CustomScrollbar", *style.configure("Vertical.Scrollbar"))
+        style.configure("CustomScrollbar", troughcolor=config.bg)
 
 
 class TilemapEditorWindow(tk.Frame):
@@ -947,17 +1001,17 @@ class TilemapEditorWindow(tk.Frame):
         # Add tool-mode buttons
         for i, j in enumerate(["draw", "move"]):
             self.tool_button = tk.Radiobutton(self.buttons_bar, indicator=0, value=i, variable=self.tool_mode,
-                                              image=TilemapEditorWindow.imgs[j])
+                                              image=TilemapEditorWindow.imgs[j], selectcolor=config.active_bg)
             self.tool_button.grid(row=0, column=i + 1, sticky=tk.NW)
 
         # Add grid toggling buttons
         self.grid_button = tk.Checkbutton(self.buttons_bar, variable=self.grid_mode, indicator=0,
-                                          image=TilemapEditorWindow.imgs["grid"])
+                                          image=TilemapEditorWindow.imgs["grid"], selectcolor=config.active_bg)
         self.grid_button.grid(row=0, column=3, sticky=tk.NW)
 
         # Add border toggling buttons
         self.grid_button = tk.Checkbutton(self.buttons_bar, variable=self.border_mode, indicator=0,
-                                          image=TilemapEditorWindow.imgs["border"])
+                                          image=TilemapEditorWindow.imgs["border"], selectcolor=config.active_bg)
         self.grid_button.grid(row=0, column=4, sticky=tk.NW)
 
         # Add spacing
@@ -976,7 +1030,7 @@ class TilemapEditorWindow(tk.Frame):
         i = 0
         for i, j in enumerate(self.layers):
             self.layer_button = tk.Radiobutton(self.buttons_bar, indicator=0, value=i, variable=self.layer,
-                                               image=j.icon)
+                                               image=j.icon, selectcolor=config.active_bg)
             self.layer_button.grid(row=0, column=i + 6, sticky=tk.NW)
 
         # Add another spacing
@@ -1004,18 +1058,20 @@ class TilemapEditorWindow(tk.Frame):
         self.height_label = tk.Label(self.height_adjust_button_frame, text="Height")
         self.height_label.grid(row=0, column=1, sticky=tk.W)
 
-        self.height_down_button = tk.Button(self.height_adjust_button_frame, text="▼", command=lambda: self.change_height(-1))
+        self.height_down_button = tk.Button(self.height_adjust_button_frame, text="▼",
+                                            command=lambda: self.change_height(-1))
         self.height_down_button.grid(row=0, column=2, sticky=tk.W)
 
         self.height_text = tk.Label(self.height_adjust_button_frame, textvariable=self.selected_height_text,
                                     borderwidth=1, relief=tk.SUNKEN, padx=5, pady=5)
         self.height_text.grid(row=0, column=3, sticky=tk.W)
 
-        self.height_up_button = tk.Button(self.height_adjust_button_frame, text="▲", command=lambda: self.change_height(1))
+        self.height_up_button = tk.Button(self.height_adjust_button_frame, text="▲",
+                                          command=lambda: self.change_height(1))
         self.height_up_button.grid(row=0, column=4, sticky=tk.W)
 
         # Hide the frame until it is needed later
-        self.height_adjust_button_frame.grid(row=0, column=i+10, sticky=tk.W)
+        self.height_adjust_button_frame.grid(row=0, column=i + 10, sticky=tk.W)
         self.height_adjust_button_frame.grid_remove()
 
         # Set up tool keybindings
@@ -1728,7 +1784,6 @@ class TilemapEditingLayer:
     def unload_panes(self):
         """Unload all loaded panes"""
         for name, pane in self.panes.copy().items():
-            # TODO: Add concept of "protected" panes
             if name != "All":
                 pane.forget()
                 pane.destroy()
@@ -1988,7 +2043,7 @@ class CollisionLayer(TilemapEditingLayer):
                 return
 
             # Modify tile's geometry
-            TilemapEditorWindow.ids_data[target_set][target_id]["geo"][2*sub_x+sub_y] = solid_state
+            TilemapEditorWindow.ids_data[target_set][target_id]["geo"][2 * sub_x + sub_y] = solid_state
             view.level.collider[tile_y][tile_x] = solid_state
         except IndexError:
             pass
@@ -2196,11 +2251,12 @@ class StepLayer(TilemapEditingLayer):
             if (tile_x, tile_y, z) in view.level.height_zones:
                 view.canvas.create_image(tile_x * 32 + 16, tile_y * 32 + 16,
                                          image=StepLayer.special_imgs[("mini_elevate", "mini_elevate", "mini_descend",
-                                                                       "mini_descend")[selected_state-2]])
+                                                                       "mini_descend")[selected_state - 2]])
                 if not self.render_mode:
-                    view.level.height_zones[tile_x, tile_y, z].target_height += (1, 5, -1, -5)[selected_state-2]
+                    view.level.height_zones[tile_x, tile_y, z].target_height += (1, 5, -1, -5)[selected_state - 2]
                 else:
-                    view.level.height_zones[tile_x, tile_y, z].target_render_offset += (1, 5, -1, -5)[selected_state-2]
+                    view.level.height_zones[tile_x, tile_y, z].target_render_offset += (1, 5, -1, -5)[
+                        selected_state - 2]
 
     @classmethod
     def _initialize(cls):
@@ -2480,13 +2536,13 @@ class TilemapView(tk.Frame):
 
         # Create element layout
         self.frame = tk.Frame(parent, borderwidth=1, relief=tk.SUNKEN)
-        self.canvas = tk.Canvas(self.frame, width=64 * 16, height=64 * 9, bg="WHITE", bd=0)
+        self.canvas = tk.Canvas(self.frame, width=64 * 16, height=64 * 9, bg=config.canvas_bg, bd=0)
         self.canvas.grid(row=0, column=0)
 
         # Add the scrollbars
         self.canvas_vbar = tk.Scrollbar(self.frame, orient=tk.VERTICAL, command=self.canvas.yview)
         self.canvas_vbar.grid(row=0, column=1, sticky=tk.NS)
-        self.canvas_vbar.activate("slider")
+        # self.canvas_vbar.activate("slider")
         self.canvas_hbar = tk.Scrollbar(self.frame, orient=tk.HORIZONTAL, command=self.canvas.xview)
         self.canvas_hbar.grid(row=1, column=0, sticky=tk.EW)
         self.canvas_hbar.activate("slider")
@@ -3453,7 +3509,7 @@ class SelectionPane(tk.Frame):
         """Overarching class for the object selection panes"""
         super().__init__(parent, **kw)
         # Add the tile canvas
-        self.canvas = tk.Canvas(self, width=72 * 3, height=72 * 8, bg="WHITE", bd=0)
+        self.canvas = tk.Canvas(self, width=72 * 3, height=72 * 8, bg=config.canvas_bg, bd=0)
         self.canvas.grid_propagate(False)
         self.canvas.grid(row=0, column=0, sticky=tk.NSEW)
 
@@ -3497,7 +3553,8 @@ class TilePane(SelectionPane):
                                      indicator=0,
                                      value=value,
                                      variable=self.selected_id,
-                                     image=image)
+                                     image=image,
+                                     selectcolor=config.active_bg)
 
         # Configure new radiobutton
         self.canvas.create_window(self.current_x * 72 + 36, self.current_y * 72 + 36, window=radiobutton)
@@ -3528,7 +3585,8 @@ class TileCollection(TilePane):
                                              indicator=0,
                                              value=i,
                                              variable=self.selected_id,
-                                             image=layer.img_dict[i])
+                                             image=layer.img_dict[i],
+                                             selectcolor=config.active_bg)
 
                 # Configure new radiobutton
                 self.canvas.create_window(self.current_x * 72 + 36, self.current_y * 72 + 36, window=radiobutton)
@@ -3936,7 +3994,7 @@ class SpriteView(ttk.Frame):
         self.animation_frame = tk.LabelFrame(self.window, text="Animations")
         self.animation_frame.pack(fill=tk.X, expand=1)
 
-        self.animation_canvas = tk.Canvas(self.animation_frame, width=256, height=256, bg="WHITE", bd=1)
+        self.animation_canvas = tk.Canvas(self.animation_frame, width=256, height=256, bg=config.canvas_bg, bd=1)
         self.animation_canvas.grid(row=1, column=0)
 
         self.animation_config_frame = tk.Frame(self.animation_frame)
@@ -4252,9 +4310,26 @@ class NotesEditorWindow(tk.Frame):
                 break
 
 
+@dataclass
+class Config:
+    name: str
+    bg: str = None
+    text_color: str = None
+    canvas_bg: str = None
+    active_bg: str = None
+    icon_color: str = None
+
+
+configs = {"default": Config("Default", canvas_bg="white"),
+           "dark": Config("Dark", "gray20", "white", "gray10", "gray40")}
+config = configs["dark"]
+
+
 class App:
     # Forgive me, for I have used variables with excessive scope
     project_data = {}
+
+    # Set up color schemes
 
     def __init__(self, parent):
         """World Builder 2"""
@@ -4332,6 +4407,11 @@ def main():
                                              ''')
 
     root.iconphoto(False, icon)
+    root.configure(bg=config.bg)
+    if config.name != "Default":
+        root.tk_setPalette(background=config.bg, foreground=config.text_color, activebackground=config.active_bg,
+                           troughcolor=config.bg, highlightcolor=config.active_bg, selectcolor=config.active_bg,
+                           bordercolor=config.bg)
 
     main_app = App(root)
     root.mainloop()
