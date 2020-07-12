@@ -13,19 +13,23 @@
   "levels": {
     "demo": {
       "path": "maps/demo.json",
-      "world_pos": [0, 0]
+      "world_pos": [22, 29]
     },
     "demo_house": {
       "path": "maps/demo_house.json",
-      "world_pos": [91, -135]
+      "world_pos": [94, -104]
     },
     "demo2": {
       "path": "maps/demo2.json",
-      "world_pos": [208, 0]
+      "world_pos": [229, 29]
     },
     "valley": {
       "path": "maps/valley.json",
-      "world_pos": [-272, 0]
+      "world_pos": [-250, 29]
+    },
+    "demo_island": {
+      "path": "maps/demo_island.json",
+      "world_pos": [22, 153]
     }
   },
   "sprites": {

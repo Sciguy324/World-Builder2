@@ -1099,7 +1099,7 @@ class TilemapEditorWindow(tk.Frame):
         self.tilemap_panel.grid(row=1, column=1, sticky=tk.NW)
 
         # Add "new map" button to the editor
-        self.new_view_button = ttk.Button(self, command=self.new_view, image=TilemapEditorWindow.imgs["add_new"])
+        self.new_view_button = tk.Button(self, command=self.new_view, image=TilemapEditorWindow.imgs["add_new"])
         self.new_view_button.grid(row=1, column=0, sticky=tk.NW)
 
         # Add the Selection panes
@@ -2831,6 +2831,7 @@ class TilemapView(tk.Frame):
         if selected_z <= 1:
             for y, i in enumerate(self.level.tilemap):
                 for x, _id in enumerate(i):
+                    print(f'Height: {len(self.level.collider)}, Width: {len(self.level.collider[0])}, X: {x}, Y: {y}')
                     self.level.collider[y * 2][x * 2] = TilemapEditorWindow.ids_data["tile_ids"][_id]["geo"][0]
                     self.level.collider[y * 2 + 1][x * 2] = TilemapEditorWindow.ids_data["tile_ids"][_id]["geo"][1]
                     self.level.collider[y * 2][x * 2 + 1] = TilemapEditorWindow.ids_data["tile_ids"][_id]["geo"][2]
@@ -2886,6 +2887,7 @@ class TilemapView(tk.Frame):
 
         # If this file is NOT part of the project and hasn't been excluded, ask whether it should be.
         print("Ignore level from project:", self.level.ignore_from_project)
+        remember_to_include = False
         if not self.level.ignore_from_project:
             if self.level.name not in App.project_data["levels"]:
                 result = messagebox.askyesnocancel(title="Unregistered Level", message="This level was not found in "
@@ -2899,7 +2901,7 @@ class TilemapView(tk.Frame):
                     return
                 elif result:
                     # User added level to project.json
-                    App.project_data["levels"][self.level.name] = {"path": "", "world_pos": self.level.world_pos}
+                    remember_to_include = True
                 else:
                     # User excluded level from project.json
                     self.level.ignore_from_project = True
@@ -2921,6 +2923,10 @@ class TilemapView(tk.Frame):
             self.level.name = path.splitext(file)[0]
             file = path.join("maps", file)
             self.file_path = file
+
+            # Add level to project.json, if applicable
+            if remember_to_include:
+                App.project_data["levels"][self.level.name] = {"path": "", "world_pos": self.level.world_pos}
 
         # Only apply this part of the level is in project.json
         if self.level.name in App.project_data["levels"]:
@@ -3082,6 +3088,9 @@ class Level:
         result.tilemap = []
         for i in self.tilemap:
             result.tilemap.append(i.copy())
+        result.collider = []
+        for i in self.collider:
+            result.collider.append(i.copy())
         result.decomap = self.decomap.copy()
         result.default_start = self.default_start.copy()
         result.lightmap = self.lightmap.copy()
