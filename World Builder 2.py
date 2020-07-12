@@ -2831,7 +2831,6 @@ class TilemapView(tk.Frame):
         if selected_z <= 1:
             for y, i in enumerate(self.level.tilemap):
                 for x, _id in enumerate(i):
-                    print(f'Height: {len(self.level.collider)}, Width: {len(self.level.collider[0])}, X: {x}, Y: {y}')
                     self.level.collider[y * 2][x * 2] = TilemapEditorWindow.ids_data["tile_ids"][_id]["geo"][0]
                     self.level.collider[y * 2 + 1][x * 2] = TilemapEditorWindow.ids_data["tile_ids"][_id]["geo"][1]
                     self.level.collider[y * 2][x * 2 + 1] = TilemapEditorWindow.ids_data["tile_ids"][_id]["geo"][2]
